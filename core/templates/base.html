@@ -1,0 +1,26 @@
+{% load static %}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}Dashboard{% endblock %} – Rollcall HR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/app.css' %}"></head>
+<body>
+<aside class="side">
+  <a class="brand" href="{% url 'dashboard' %}">Rollcall</a>
+  <nav>
+    <a href="{% url 'dashboard' %}" class="{% if nav == 'dashboard' %}on{% endif %}">Dashboard</a>
+    <a href="{% url 'employees' %}" class="{% if nav == 'employees' %}on{% endif %}">Employees</a>
+    <a href="{% url 'departments' %}" class="{% if nav == 'departments' %}on{% endif %}">Departments</a>
+    <a href="{% url 'leaves' %}" class="{% if nav == 'leaves' %}on{% endif %}">Leave</a>
+    <a href="{% url 'attendance' %}" class="{% if nav == 'attendance' %}on{% endif %}">Attendance</a>
+  </nav>
+  <div class="me">
+    <b>{{ request.session.name }}</b><small>{{ request.session.role|title }}</small>
+    <a href="{% url 'password' %}">Change password</a><a href="{% url 'logout' %}">Sign out</a>
+  </div>
+</aside>
+<main>
+  {% for m in messages %}<div class="flash {{ m.tags }}" role="status">{{ m }}</div>{% endfor %}
+  {% block content %}{% endblock %}
+</main>
+</body></html>

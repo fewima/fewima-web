@@ -1,0 +1,13 @@
+{% load static %}<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in – Rollcall HR</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/app.css' %}"></head>
+<body class="auth">
+<form method="post" class="auth-card">{% csrf_token %}
+  <h1>Rollcall</h1><p>Sign in to manage your people.</p>
+  {% for m in messages %}<div class="flash {{ m.tags }}">{{ m }}</div>{% endfor %}
+  <label>Email<input type="email" name="email" required autofocus></label>
+  <label>Password<input type="password" name="password" required></label>
+  <button class="btn wide">Sign in</button>
+  <small class="hint">First run? Use <b>admin@hrms.local</b> / <b>admin123</b>.</small>
+</form></body></html>

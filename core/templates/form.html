@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<header class="head"><h1>{{ title }}</h1></header>
+<form method="post" class="card form" novalidate>{% csrf_token %}
+  {% for f in form %}
+  <div class="field {% if f.errors %}bad{% endif %}"><label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}
+    {% for e in f.errors %}<small class="err">{{ e }}</small>{% endfor %}</div>
+  {% endfor %}
+  {% for e in form.non_field_errors %}<div class="flash error">{{ e }}</div>{% endfor %}
+  <div class="actions"><button class="btn">{{ save }}</button><a class="btn ghost" href="{% url back %}">Cancel</a></div>
+</form>{% endblock %}

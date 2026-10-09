@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block title %}Attendance{% endblock %}
+{% block content %}
+<header class="head"><div><h1>Attendance</h1><p>Arrivals after {{ late_after }} are marked late</p></div>
+<form method="get" class="inline"><input type="date" name="date" value="{{ day }}" onchange="this.form.submit()" aria-label="Date"></form></header>
+<div class="card clock"><div>
+  {% if not mine %}<h2>You haven't clocked in today</h2>
+  {% elif not mine.check_out %}<h2>Clocked in at {{ mine.check_in }}</h2>
+  {% else %}<h2>Done for the day</h2><p>{{ mine.check_in }} to {{ mine.check_out }}</p>{% endif %}</div>
+  {% if not mine or not mine.check_out %}<form method="post" action="{% url 'clock' %}">{% csrf_token %}
+    <button class="btn big">{% if mine %}Clock out{% else %}Clock in{% endif %}</button></form>{% endif %}
+</div>
+<div class="card flush table-wrap"><table>
+<thead><tr><th>Employee</th><th>Date</th><th>In</th><th>Out</th><th></th></tr></thead>
+<tbody>{% for a in rows %}<tr><td><b>{{ a.name }}</b></td><td>{{ a.date }}</td><td>{{ a.check_in }}</td><td>{{ a.check_out|default:"–" }}</td>
+  <td>{% if a.late %}<span class="badge late">Late</span>{% else %}<span class="badge on-time">On time</span>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="5" class="empty">No attendance recorded for {{ day }}.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

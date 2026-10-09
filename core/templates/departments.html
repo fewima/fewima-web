@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block title %}Departments{% endblock %}
+{% block content %}
+<header class="head"><div><h1>Departments</h1><p>{{ rows|length }} in the company</p></div>
+{% if request.session.role == "admin" %}<a class="btn" href="{% url 'department_add' %}">Add department</a>{% endif %}</header>
+<div class="cards">{% for d in rows %}
+  <div class="card dept"><h2>{{ d.name }}</h2><p>{{ d.description|default:"No description yet." }}</p>
+    <dl><div><dt>Head</dt><dd>{{ d.head|default:"Not assigned" }}</dd></div><div><dt>People</dt><dd>{{ d.count }}</dd></div></dl>
+    {% if request.session.role == "admin" %}<div class="actions"><a class="link" href="{% url 'department_edit' d.id %}">Edit</a>
+      <form method="post" class="inline" action="{% url 'department_delete' d.id %}" onsubmit="return confirm('Delete this department?')">{% csrf_token %}<button class="link danger">Delete</button></form></div>{% endif %}
+  </div>{% empty %}<p class="empty">No departments yet.</p>{% endfor %}</div>
+{% endblock %}

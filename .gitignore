@@ -1,0 +1,8 @@
+venv/
+.venv/
+fewima-environ/
+__pycache__/
+*.pyc
+.env
+db.sqlite3
+.vscode/

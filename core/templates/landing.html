@@ -1,0 +1,56 @@
+{% load static %}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rollcall HR – Employees, leave and attendance in one place</title>
+<meta name="description" content="Rollcall keeps employee records, leave approvals and attendance together so HR can spend less time chasing and more time deciding.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/landing.css' %}"></head>
+<body>
+<section class="hero">
+  <header class="bar wrap">
+    <a class="logo" href="{% url 'landing' %}">Rollcall</a>
+    <nav><a href="#features">Features</a><a href="#roles">Who it's for</a><a class="btn light" href="{% url 'login' %}">Sign in</a></nav>
+  </header>
+  <div class="wrap hero-grid">
+    <div class="pitch">
+      <h1>Every employee, leave request and clock-in in one place.</h1>
+      <p>Rollcall keeps your records, approvals and attendance together, so HR spends less time chasing people and more time deciding.</p>
+      <div class="cta"><a class="btn big" href="{% url 'login' %}">Sign in to Rollcall</a><a class="btn big ghost" href="#features">See what's inside</a></div>
+    </div>
+    <div class="board" aria-label="Example of the daily roll call screen">
+      <div class="board-head"><b>Today at the office</b><span>3 of 4 in</span></div>
+      <ul>
+        <li><i>AO</i><div><b>Ada Obi</b><small>Engineering</small></div><em>In at 08:42</em><span class="tag ok">On time</span></li>
+        <li><i>TB</i><div><b>Tunde Bello</b><small>Finance</small></div><em>In at 09:31</em><span class="tag late">Late</span></li>
+        <li><i>CE</i><div><b>Chioma Eze</b><small>Marketing</small></div><em>In at 08:55</em><span class="tag ok">On time</span></li>
+        <li><i>IM</i><div><b>Ibrahim Musa</b><small>Operations</small></div><em>Not in yet</em><span class="tag">Absent</span></li>
+      </ul>
+      <div class="ask"><div><b>Ngozi Okafor</b><small>Annual leave, 3 days</small></div><span class="mini">Approve</span><span class="mini out">Reject</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="features" class="wrap features">
+  <h2>What HR does every day, without the spreadsheets</h2>
+  <div class="flist">
+    <article><h3>Employee records</h3><p>Keep job title, department, salary and hire date for every person, and find anyone in seconds with search.</p></article>
+    <article><h3>Departments</h3><p>See how many people work in each team and who leads it. Rename a team and everyone moves with it.</p></article>
+    <article><h3>Leave approvals</h3><p>Staff request time off from their own login. You see what's waiting and approve or reject in one click.</p></article>
+    <article><h3>Attendance</h3><p>One tap to clock in and out. Arrivals after 09:15 are flagged as late, so you never have to count by hand.</p></article>
+  </div>
+</section>
+
+<section id="roles" class="roles"><div class="wrap">
+  <h2>One system, two views</h2>
+  <div class="two">
+    <div><h3>HR administrators</h3><p>Add and edit employees, manage departments, approve leave, see monthly payroll and check everyone's attendance.</p></div>
+    <div><h3>Employees</h3><p>Browse the staff directory, request leave, track the answer and clock in and out. HR creates their login when adding them.</p></div>
+  </div>
+</div></section>
+
+<section class="wrap final">
+  <h2>Ready to see who's in today?</h2>
+  <a class="btn big" href="{% url 'login' %}">Sign in to Rollcall</a>
+</section>
+<footer class="wrap foot">Rollcall HR. Built with Django and MongoDB.</footer>
+</body></html>

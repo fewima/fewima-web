@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="head"><div><h1>Good to see you, {{ request.session.name|truncatewords:1 }}</h1>
+<p>{% now "l, j F Y" %}</p></div></header>
+
+<section class="stats">
+  <a class="stat" href="{% url 'employees' %}"><b>{{ headcount }}</b><span>active employees</span></a>
+  <a class="stat" href="{% url 'attendance' %}"><b>{{ present }}</b><span>clocked in today</span></a>
+  <a class="stat {% if pending %}alert{% endif %}" href="{% url 'leaves' %}?status=Pending"><b>{{ pending }}</b><span>leave requests waiting</span></a>
+  {% if request.session.role == "admin" %}<div class="stat"><b>{{ currency }}{{ payroll|floatformat:"0g" }}</b><span>monthly payroll</span></div>
+  {% else %}<a class="stat" href="{% url 'leaves' %}"><b>{{ my_pending }}</b><span>of your requests pending</span></a>{% endif %}
+</section>
+
+<section class="grid2">
+  <div class="card"><h2>Who works where</h2>
+    {% for r in roster %}<div class="bar"><span>{{ r.name }}</span><i style="width:{{ r.pct }}%"></i><em>{{ r.n }}</em></div>
+    {% empty %}<p class="empty">No active employees yet. <a href="{% url 'employee_add' %}">Add the first one.</a></p>{% endfor %}
+  </div>
+  <div class="card"><h2>Newest hires</h2>
+    {% for e in recent %}<div class="row"><span class="av">{{ e.first_name|first }}{{ e.last_name|first }}</span>
+      <div><b>{{ e.first_name }} {{ e.last_name }}</b><small>{{ e.position }}, {{ e.department }}</small></div><time>{{ e.hire_date }}</time></div>
+    {% empty %}<p class="empty">Nobody has been hired yet.</p>{% endfor %}
+  </div>
+</section>
+
+{% if request.session.role == "admin" %}
+<div class="card"><h2>Waiting for your decision</h2>
+  {% for l in waiting %}<div class="row"><div><b>{{ l.name }}</b><small>{{ l.leave_type }} · {{ l.start_date }} to {{ l.end_date }} ({{ l.days }} day{{ l.days|pluralize }})</small></div>
+    <form method="post" class="inline" action="{% url 'leave_action' l.id 'approve' %}">{% csrf_token %}<input type="hidden" name="next" value="/dashboard/">
+      <button class="btn sm">Approve</button></form>
+    <form method="post" class="inline" action="{% url 'leave_action' l.id 'reject' %}">{% csrf_token %}<input type="hidden" name="next" value="/dashboard/">
+      <button class="btn sm ghost">Reject</button></form></div>
+  {% empty %}<p class="empty">You're all caught up.</p>{% endfor %}
+</div>{% endif %}
+{% endblock %}

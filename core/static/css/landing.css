@@ -1,0 +1,41 @@
+:root{--ink:#16202e;--ink2:#243246;--paper:#f3f4f6;--line:#dfe3e9;--text:#1b2430;--mute:#677184;--jade:#0f7a5a;--mint:#3ddc97;--amber:#b86e00;--rose:#b3261e}
+*{box-sizing:border-box}html{scroll-behavior:smooth;font-size:16px}
+body{margin:0;background:var(--paper);color:var(--text);font-family:"Instrument Sans",system-ui,sans-serif;line-height:1.6}
+a{color:inherit}h1,h2,h3{margin:0;letter-spacing:-.02em;line-height:1.15}small{display:block;color:inherit;opacity:.65;font-size:.82rem}
+.wrap{width:min(1120px,100% - 2.5rem);margin-inline:auto}
+:focus-visible{outline:2px solid #7cc4ff;outline-offset:3px}
+.btn{display:inline-block;padding:.6rem 1.1rem;border-radius:8px;background:var(--jade);color:#fff;font-weight:600;text-decoration:none;border:1px solid var(--jade)}
+.btn:hover{background:#0b5c44;border-color:#0b5c44}.btn.big{padding:.85rem 1.5rem;font-size:1.02rem}
+.btn.light{background:#fff;color:var(--ink);border-color:#fff}.btn.light:hover{background:#e6e9ee;border-color:#e6e9ee}
+.btn.ghost{background:transparent;color:#fff;border-color:#4b5b75}.btn.ghost:hover{background:var(--ink2)}
+
+.hero{background:var(--ink);color:#e7ebf2;padding-bottom:5rem}
+.bar{display:flex;justify-content:space-between;align-items:center;padding:1.4rem 0}
+.logo{font-size:1.5rem;font-weight:700;letter-spacing:-.03em;color:#fff;text-decoration:none}
+.bar nav{display:flex;align-items:center;gap:1.6rem}.bar nav a:not(.btn){text-decoration:none;color:#b9c3d3}.bar nav a:not(.btn):hover{color:#fff}
+.hero-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:3.5rem;align-items:center;padding-top:3rem}
+.pitch h1{font-size:clamp(2.2rem,4.6vw,3.5rem);color:#fff;max-width:15ch}
+.pitch p{font-size:1.12rem;color:#b9c3d3;max-width:46ch;margin:1.3rem 0 2rem}
+.cta{display:flex;gap:.8rem;flex-wrap:wrap}
+
+.board{background:#fff;color:var(--text);border-radius:14px;padding:1.2rem 1.3rem;border-left:5px solid var(--mint)}
+.board-head{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:.8rem;border-bottom:1px solid var(--line)}
+.board-head span{color:var(--jade);font-weight:600;font-size:.9rem}
+.board ul{list-style:none;margin:0;padding:0}
+.board li{display:grid;grid-template-columns:36px 1fr auto 70px;gap:.8rem;align-items:center;padding:.7rem 0;border-bottom:1px solid var(--line);font-size:.92rem}
+.board li i{width:36px;height:36px;border-radius:50%;background:#dff3ea;color:#0b5c44;display:grid;place-items:center;font:700 .75rem "Instrument Sans";font-style:normal}
+.board li em{font-style:normal;color:var(--mute);font-size:.84rem}
+.tag{font-size:.74rem;font-weight:600;padding:.12rem .55rem;border-radius:99px;background:#eceef2;color:#4a5568;text-align:center}
+.tag.ok{background:#dff3ea;color:#0b5c44}.tag.late{background:#fcefd6;color:var(--amber)}
+.ask{display:flex;align-items:center;gap:.6rem;margin-top:1rem;padding:.8rem 1rem;border-radius:10px;background:#fff9ee;border:1px solid #f0d9a8}
+.ask>div{flex:1}.mini{font-size:.78rem;font-weight:600;padding:.28rem .7rem;border-radius:7px;background:var(--jade);color:#fff}.mini.out{background:transparent;color:var(--text);border:1px solid #c7ccd5}
+
+.features{padding:5rem 0 3.5rem}.features h2,.roles h2,.final h2{font-size:clamp(1.6rem,3vw,2.2rem);max-width:24ch}
+.flist{display:grid;grid-template-columns:1fr 1fr;gap:0 4rem;margin-top:2.2rem}
+.flist article{border-top:2px solid var(--ink);padding:1.2rem 0 2rem}.flist h3{font-size:1.2rem;margin-bottom:.4rem}.flist p{margin:0;color:var(--mute);max-width:44ch}
+.roles{background:#e8ebf0;padding:4rem 0}.two{display:grid;grid-template-columns:1fr 1fr;gap:3rem;margin-top:1.8rem}
+.two h3{font-size:1.15rem;margin-bottom:.4rem}.two p{margin:0;color:var(--mute);max-width:46ch}
+.final{text-align:center;padding:5rem 0 4rem}.final h2{margin:0 auto 1.6rem}
+.foot{padding:1.5rem 0 2.5rem;border-top:1px solid var(--line);color:var(--mute);font-size:.88rem}
+@media(max-width:860px){.hero-grid,.flist,.two{grid-template-columns:1fr}.hero-grid{gap:2.5rem}.flist{gap:0}.bar nav a:not(.btn){display:none}.board li{grid-template-columns:36px 1fr 70px}.board li em{display:none}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
