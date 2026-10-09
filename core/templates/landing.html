@@ -1,56 +1,191 @@
 {% load static %}<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rollcall HR – Employees, leave and attendance in one place</title>
-<meta name="description" content="Rollcall keeps employee records, leave approvals and attendance together so HR can spend less time chasing and more time deciding.">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'css/landing.css' %}"></head>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fewima Consulting – HR Management System</title>
+  <meta name="description" content="Fewima Consulting's HR platform brings employee records, leave approvals and attendance into one secure workspace.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/landing.css' %}">
+</head>
 <body>
-<section class="hero">
-  <header class="bar wrap">
-    <a class="logo" href="{% url 'landing' %}">Rollcall</a>
-    <nav><a href="#features">Features</a><a href="#roles">Who it's for</a><a class="btn light" href="{% url 'login' %}">Sign in</a></nav>
-  </header>
-  <div class="wrap hero-grid">
-    <div class="pitch">
-      <h1>Every employee, leave request and clock-in in one place.</h1>
-      <p>Rollcall keeps your records, approvals and attendance together, so HR spends less time chasing people and more time deciding.</p>
-      <div class="cta"><a class="btn big" href="{% url 'login' %}">Sign in to Rollcall</a><a class="btn big ghost" href="#features">See what's inside</a></div>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="{% url 'landing' %}"> <a class="brand" href="{% url 'dashboard' %}"><img src="{% static 'img/logo.jpg' %}"
+     alt="Fewima"
+     width="55"
+     height="55"
+     style="border-radius: 50%; border: 3px solid #007bff; object-fit: cover;">Fewima Consulting</a>
+    <nav aria-label="Main">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#teams">Teams</a>
+      <a href="#security">Security</a>
+    </nav>
+    <a class="btn" href="{% url 'login' %}">Sign in</a>
+  </div>
+</header>
+
+<main>
+  <!-- Hero -->
+  <section class="hero wrap">
+    <h1>One secure system for your people, leave and attendance.</h1>
+    <p class="lead">Fewima Consulting's HR platform keeps employee records, leave approvals and daily attendance together, so your team spends less time on paperwork and more time on people.</p>
+    <div class="cta">
+      <a class="btn big" href="{% url 'login' %}">Sign in to your workspace</a>
+      <a class="btn big outline" href="#features">Explore features</a>
     </div>
-    <div class="board" aria-label="Example of the daily roll call screen">
-      <div class="board-head"><b>Today at the office</b><span>3 of 4 in</span></div>
-      <ul>
-        <li><i>AO</i><div><b>Ada Obi</b><small>Engineering</small></div><em>In at 08:42</em><span class="tag ok">On time</span></li>
-        <li><i>TB</i><div><b>Tunde Bello</b><small>Finance</small></div><em>In at 09:31</em><span class="tag late">Late</span></li>
-        <li><i>CE</i><div><b>Chioma Eze</b><small>Marketing</small></div><em>In at 08:55</em><span class="tag ok">On time</span></li>
-        <li><i>IM</i><div><b>Ibrahim Musa</b><small>Operations</small></div><em>Not in yet</em><span class="tag">Absent</span></li>
-      </ul>
-      <div class="ask"><div><b>Ngozi Okafor</b><small>Annual leave, 3 days</small></div><span class="mini">Approve</span><span class="mini out">Reject</span></div>
+
+    <figure class="frame" aria-label="Sample view of the HR dashboard">
+      <div class="frame-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="frame-body">
+        <div class="fside" aria-hidden="true">
+          <b>Fewima</b><span class="on">Dashboard</span><span>Employees</span><span>Departments</span><span>Leave</span><span>Attendance</span>
+        </div>
+        <div class="fmain">
+          <div class="fstats">
+            <div><b>48</b><small>active employees</small></div>
+            <div><b>41</b><small>clocked in today</small></div>
+            <div class="warn"><b>3</b><small>leave requests waiting</small></div>
+            <div><b>₦12.4M</b><small>monthly payroll</small></div>
+          </div>
+          <div class="fcols">
+            <div class="fcard">
+              <h3>Who works where</h3>
+              <div class="bar"><span>Engineering</span><i style="width:100%"></i><em>14</em></div>
+              <div class="bar"><span>Operations</span><i style="width:78%"></i><em>11</em></div>
+              <div class="bar"><span>Finance</span><i style="width:64%"></i><em>9</em></div>
+              <div class="bar"><span>Marketing</span><i style="width:57%"></i><em>8</em></div>
+              <div class="bar"><span>Human Resources</span><i style="width:43%"></i><em>6</em></div>
+            </div>
+            <div class="fcard">
+              <h3>Waiting for your decision</h3>
+              <div class="req"><div><b>Ngozi Okafor</b><small>Annual leave, 3 days</small></div><span class="mini">Approve</span><span class="mini out">Reject</span></div>
+              <div class="req"><div><b>Tunde Bello</b><small>Sick leave, 1 day</small></div><span class="mini">Approve</span><span class="mini out">Reject</span></div>
+              <div class="req"><div><b>Chioma Eze</b><small>Annual leave, 5 days</small></div><span class="mini">Approve</span><span class="mini out">Reject</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <figcaption>Sample data shown.</figcaption>
+    </figure>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="section">
+    <div class="wrap">
+      <div class="head">
+        <h2>Everything HR needs to run day to day</h2>
+        <p>Replace scattered spreadsheets and email threads with one place that everyone in the company can trust.</p>
+      </div>
+      <div class="fgrid">
+        <article>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.3c2 .7 3.5 2.4 3.5 5.7"/></svg>
+          <h3>Employee records</h3>
+          <p>Store job title, department, contact details, salary and hire date for every person, and find anyone in seconds.</p>
+        </article>
+        <article>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="10" height="18" rx="1"/><path d="M14 9h6v12h-6M8 7h2M8 11h2M8 15h2"/></svg>
+          <h3>Departments</h3>
+          <p>See headcount for each team and who leads it. Rename a department and every employee moves with it.</p>
+        </article>
+        <article>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+          <h3>Leave management</h3>
+          <p>Staff request time off from their own login. You approve or reject in one click and the status updates instantly.</p>
+        </article>
+        <article>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          <h3>Attendance tracking</h3>
+          <p>One tap to clock in and out. Late arrivals are flagged automatically, with a daily record you can review by date.</p>
+        </article>
+        <article>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 15h2"/></svg>
+          <h3>Payroll overview</h3>
+          <p>Keep an eye on the monthly salary total across all active employees, visible to administrators only.</p>
+        </article>
+        <article>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>
+          <h3>Role-based access</h3>
+          <p>Administrators manage everything. Employees see only what they need: the directory, their leave and their attendance.</p>
+        </article>
+      </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<section id="features" class="wrap features">
-  <h2>What HR does every day, without the spreadsheets</h2>
-  <div class="flist">
-    <article><h3>Employee records</h3><p>Keep job title, department, salary and hire date for every person, and find anyone in seconds with search.</p></article>
-    <article><h3>Departments</h3><p>See how many people work in each team and who leads it. Rename a team and everyone moves with it.</p></article>
-    <article><h3>Leave approvals</h3><p>Staff request time off from their own login. You see what's waiting and approve or reject in one click.</p></article>
-    <article><h3>Attendance</h3><p>One tap to clock in and out. Arrivals after 09:15 are flagged as late, so you never have to count by hand.</p></article>
-  </div>
-</section>
+  <!-- How it works -->
+  <section id="how" class="section alt">
+    <div class="wrap">
+      <div class="head"><h2>Up and running in three steps</h2></div>
+      <ol class="steps">
+        <li><span>1</span><h3>Set up your company</h3><p>Create your departments and add employees. Each person receives a login automatically.</p></li>
+        <li><span>2</span><h3>Your team takes part</h3><p>Employees sign in to request leave, check their status and clock in when they arrive.</p></li>
+        <li><span>3</span><h3>HR stays in control</h3><p>Approve requests, review attendance and see headcount and payroll from a single dashboard.</p></li>
+      </ol>
+    </div>
+  </section>
 
-<section id="roles" class="roles"><div class="wrap">
-  <h2>One system, two views</h2>
-  <div class="two">
-    <div><h3>HR administrators</h3><p>Add and edit employees, manage departments, approve leave, see monthly payroll and check everyone's attendance.</p></div>
-    <div><h3>Employees</h3><p>Browse the staff directory, request leave, track the answer and clock in and out. HR creates their login when adding them.</p></div>
-  </div>
-</div></section>
+  <!-- Teams -->
+  <section id="teams" class="section">
+    <div class="wrap">
+      <div class="head"><h2>Built for both sides of HR</h2></div>
+      <div class="two">
+        <div class="panel">
+          <h3>For HR administrators</h3>
+          <ul class="ticks">
+            <li>Add, edit and remove employees</li>
+            <li>Manage departments and team heads</li>
+            <li>Approve or reject leave requests</li>
+            <li>Review attendance for any date</li>
+            <li>See headcount and monthly payroll</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>For employees</h3>
+          <ul class="ticks">
+            <li>Browse the company directory</li>
+            <li>Request leave and track the decision</li>
+            <li>Clock in and out each day</li>
+            <li>Change their own password</li>
+            <li>See only their own records</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
 
-<section class="wrap final">
-  <h2>Ready to see who's in today?</h2>
-  <a class="btn big" href="{% url 'login' %}">Sign in to Rollcall</a>
-</section>
-<footer class="wrap foot">Rollcall HR. Built with Django and MongoDB.</footer>
-</body></html>
+  <!-- Security -->
+  <section id="security" class="section alt">
+    <div class="wrap">
+      <div class="head"><h2>Your people data, handled carefully</h2></div>
+      <div class="trio">
+        <div><h3>Protected sign-in</h3><p>Passwords are stored as salted hashes, never in plain text, and every form is protected against cross-site request forgery.</p></div>
+        <div><h3>Access by role</h3><p>Sensitive actions such as editing records, approving leave and viewing payroll are limited to administrators.</p></div>
+        <div><h3>Reliable storage</h3><p>Records live in MongoDB, a proven database built for growing data and easy backups.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Call to action -->
+  <section class="final">
+    <div class="wrap">
+      <h2>Bring your HR work into one place</h2>
+      <p>Sign in to your Fewima Consulting workspace to manage your team.</p>
+      <a class="btn big" href="{% url 'login' %}">Sign in</a>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <a class="brand" href="{% url 'landing' %}"><span class="mark">F</span><span>Fewima Consulting</span></a>
+    <nav aria-label="Footer"><a href="#features">Features</a><a href="#how">How it works</a><a href="#security">Security</a><a href="{% url 'login' %}">Sign in</a></nav>
+    <small>© {% now "Y" %} Fewima Consulting. All rights reserved.</small>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,26 @@
+{% extends "auth_base.html" %}
+{% block title %}Create account{% endblock %}
+{% block content %}
+<h1>{% if first %}Create the administrator account{% else %}Create your account{% endif %}</h1>
+<p class="sub">
+  {% if first %}This first account will manage employees, leave and payroll.
+  {% else %}Use the work email HR added for you. Your name and role come from your employee record.{% endif %}
+</p>
+
+<form method="post" novalidate>
+  {% csrf_token %}
+  {% for f in form %}
+  <div class="field {% if f.errors %}bad{% endif %}">
+    <label for="{{ f.id_for_label }}">{{ f.label }}</label>
+    {% if f.name == "password" or f.name == "confirm" %}
+      <div class="pw">{{ f }}<button type="button" data-toggle="{{ f.id_for_label }}" aria-pressed="false">Show</button></div>
+    {% else %}{{ f }}{% endif %}
+    {% if f.help_text %}<small class="help">{{ f.help_text }}</small>{% endif %}
+    {% for e in f.errors %}<small class="err">{{ e }}</small>{% endfor %}
+  </div>
+  {% endfor %}
+  <button class="btn wide">Create account</button>
+</form>
+
+<p class="alt">Already registered? <a href="{% url 'login' %}">Sign in</a></p>
+{% endblock %}

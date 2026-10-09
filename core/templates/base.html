@@ -1,12 +1,16 @@
 {% load static %}<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{% block title %}Dashboard{% endblock %} – Rollcall HR</title>
+<title>{% block title %}Dashboard{% endblock %} – Fewima HR</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'css/app.css' %}"></head>
 <body>
 <aside class="side">
-  <a class="brand" href="{% url 'dashboard' %}">Rollcall</a>
+  <a class="brand" href="{% url 'dashboard' %}"><img src="{% static 'img/logo.jpg' %}"
+     alt="Fewima"
+     width="55"
+     height="55"
+     style="border-radius: 50%; border: 3px solid #007bff; object-fit: cover;"></a>
   <nav>
     <a href="{% url 'dashboard' %}" class="{% if nav == 'dashboard' %}on{% endif %}">Dashboard</a>
     <a href="{% url 'employees' %}" class="{% if nav == 'employees' %}on{% endif %}">Employees</a>

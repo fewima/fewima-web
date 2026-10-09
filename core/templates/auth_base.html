@@ -1,0 +1,52 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Sign in{% endblock %} – Fewima Consulting</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/auth.css' %}">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <a class="brand" href="{% url 'landing' %}"><img src="{% static 'img/logo.jpg' %}"
+     alt="Fewima"
+     width="55"
+     height="55"
+     style="border-radius: 50%; border: 3px solid #007bff; object-fit: cover;"><span>Fewima Consulting</span></a>
+    <div class="side-copy">
+      <h2>Manage your people with confidence.</h2>
+      <ul>
+        <li>Employee records, always up to date</li>
+        <li>Leave requests approved in one click</li>
+        <li>Daily attendance tracked automatically</li>
+      </ul>
+    </div>
+    <small>© {% now "Y" %} Fewima Consulting. All rights reserved.</small>
+  </aside>
+
+  <main class="main">
+    <a class="brand mobile-brand" href="{% url 'landing' %}"><span class="mark">F</span><span>Fewima Consulting</span></a>
+    <div class="box">
+      {% for m in messages %}<div class="flash {{ m.tags }}" role="alert">{{ m }}</div>{% endfor %}
+      {% block content %}{% endblock %}
+    </div>
+    <a class="back" href="{% url 'landing' %}">Back to website</a>
+  </main>
+</div>
+<script>
+  document.querySelectorAll("[data-toggle]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var input = document.getElementById(btn.dataset.toggle);
+      var show = input.type === "password";
+      input.type = show ? "text" : "password";
+      btn.textContent = show ? "Hide" : "Show";
+      btn.setAttribute("aria-pressed", show);
+    });
+  });
+</script>
+</body>
+</html>

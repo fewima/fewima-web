@@ -38,3 +38,23 @@ class LeaveForm(forms.Form):
         if s and e and e < s:
             self.add_error("end_date", "End date must be on or after the start date.")
         return data
+
+
+class RegisterForm(forms.Form):
+    name = forms.CharField(max_length=100, label="Full name")
+    email = forms.EmailField(label="Work email", widget=forms.EmailInput(attrs={"autocomplete": "email"}))
+    password = forms.CharField(min_length=8, widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+                               help_text="At least 8 characters.")
+    confirm = forms.CharField(label="Confirm password", widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}))
+
+    def __init__(self, *args, first=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.first = first
+        if not first:  # employees get their name from the record HR created
+            del self.fields["name"]
+
+    def clean(self):
+        data = super().clean()
+        if data.get("password") and data.get("confirm") and data["password"] != data["confirm"]:
+            self.add_error("confirm", "Passwords don't match.")
+        return data

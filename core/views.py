@@ -11,9 +11,8 @@ from django.views.decorators.http import require_POST
 from pymongo.errors import DuplicateKeyError
 
 from .db import clean, db, oid
-from .forms import DepartmentForm, EmployeeForm, LeaveForm
+from .forms import DepartmentForm, EmployeeForm, LeaveForm, RegisterForm
 
-DEFAULT_PASSWORD = "ChangeMe123"
 LATE_AFTER = "09:15"
 
 
@@ -52,12 +51,9 @@ def seed():
     d.users.create_index("email", unique=True)
     d.employees.create_index("email", unique=True)
     d.departments.create_index("name", unique=True)
-    if d.users.count_documents({}):
-        return
-    d.users.insert_one({"email": "admin@hrms.local", "name": "HR Admin", "role": "admin",
-                        "password": make_password("admin123")})
-    for n in ("Engineering", "Human Resources", "Finance", "Marketing", "Operations"):
-        d.departments.insert_one({"name": n, "head": "", "description": ""})
+    if not d.departments.count_documents({}):
+        for n in ("Engineering", "Human Resources", "Finance", "Marketing", "Operations"):
+            d.departments.insert_one({"name": n, "head": "", "description": ""})
 
 
 # ---------- landing ----------
@@ -71,18 +67,56 @@ def landing(request):
 def login_view(request):
     if request.session.get("uid"):
         return redirect("dashboard")
+    ctx = {"first": False, "email": ""}
     try:
         seed()
+        ctx["first"] = db().users.count_documents({}) == 0
     except Exception as exc:  # MongoDB unreachable
-        messages.error(request, f"Cannot reach MongoDB at {settings.MONGO_URI}. ({exc.__class__.__name__})")
-        return render(request, "login.html")
+        messages.error(request, f"Cannot reach the database ({exc.__class__.__name__}). "
+                                "Check MONGO_URI in .env and your Atlas network access.")
+        return render(request, "login.html", ctx)
     if request.method == "POST":
-        u = db().users.find_one({"email": request.POST.get("email", "").strip().lower()})
+        email = ctx["email"] = request.POST.get("email", "").strip().lower()
+        u = db().users.find_one({"email": email})
         if u and check_password(request.POST.get("password", ""), u["password"]):
             request.session.update({"uid": str(u["_id"]), "name": u["name"], "role": u["role"], "email": u["email"]})
             return redirect("dashboard")
         messages.error(request, "Email or password is incorrect.")
-    return render(request, "login.html")
+    return render(request, "login.html", ctx)
+
+
+def register_view(request):
+    """First account becomes the HR administrator; after that, only employees HR has added can register."""
+    if request.session.get("uid"):
+        return redirect("dashboard")
+    try:
+        seed()
+        first = db().users.count_documents({}) == 0
+    except Exception as exc:
+        messages.error(request, f"Cannot reach the database ({exc.__class__.__name__}). "
+                                "Check your network access.")
+        return render(request, "register.html", {"form": RegisterForm(first=False), "first": False})
+    form = RegisterForm(request.POST or None, first=first)
+    if request.method == "POST" and form.is_valid():
+        c = form.cleaned_data
+        email = c["email"].strip().lower()
+        name, role = c.get("name", "").strip(), "admin"
+        if not first:
+            emp = db().employees.find_one({"email": email})
+            # if not emp or emp.get("status") == "Terminated":
+                # form.add_error("email", "We couldn't find an active employee with this email. Ask HR to add you first.")
+            # else:
+                # name, role = f"{emp['first_name']} {emp['last_name']}", "employee"
+        if not form.errors:
+            try:
+                db().users.insert_one({"email": email, "name": name, "role": role,
+                                       "password": make_password(c["password"])})
+            except DuplicateKeyError:
+                form.add_error("email", "An account with this email already exists. Sign in instead.")
+            else:
+                messages.success(request, "Account created. Sign in to continue.")
+                return redirect("login")
+    return render(request, "register.html", {"form": form, "first": first})
 
 
 def logout_view(request):
@@ -160,17 +194,27 @@ def employee_edit(request, pk=None):
                                       "name": f"{data['first_name']} {data['last_name']}"}})
             else:
                 db().employees.insert_one(data)
-                db().users.insert_one({"email": data["email"], "role": "employee",
-                                       "name": f"{data['first_name']} {data['last_name']}",
-                                       "password": make_password(DEFAULT_PASSWORD)})
         except DuplicateKeyError:
             form.add_error("email", "Someone with this email already exists.")
         else:
             messages.success(request, "Employee saved." if doc else
-                             f"Employee added. They can sign in with their email and the password {DEFAULT_PASSWORD}.")
+                             "Employee added. Ask them to create their account on the Register page using this work email.")
             return redirect("employees")
     return page(request, "form.html", "employees", form=form, back="employees",
                 title="Edit employee" if doc else "Add employee", save="Save employee")
+
+
+@admin_required
+@require_POST
+def employee_reset(request, pk):
+    e = db().employees.find_one({"_id": oid(pk)})
+    if e:
+        name = f"{e['first_name']} {e['last_name']}"
+        if db().users.delete_one({"email": e["email"], "role": "employee"}).deleted_count:
+            messages.success(request, f"{name}'s login was reset. They can register again with their work email.")
+        else:
+            messages.info(request, f"{name} hasn't registered yet.")
+    return redirect("employees")
 
 
 @admin_required

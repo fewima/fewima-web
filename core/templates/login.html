@@ -1,13 +1,29 @@
-{% load static %}<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sign in – Rollcall HR</title>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'css/app.css' %}"></head>
-<body class="auth">
-<form method="post" class="auth-card">{% csrf_token %}
-  <h1>Rollcall</h1><p>Sign in to manage your people.</p>
-  {% for m in messages %}<div class="flash {{ m.tags }}">{{ m }}</div>{% endfor %}
-  <label>Email<input type="email" name="email" required autofocus></label>
-  <label>Password<input type="password" name="password" required></label>
+{% extends "auth_base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<h1>Welcome back</h1>
+<p class="sub">Sign in to your Fewima Consulting workspace.</p>
+
+{% if first %}
+<div class="flash info">No accounts exist yet. <a href="{% url 'register' %}">Create the administrator account</a> to get started.</div>
+{% endif %}
+
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="field">
+    <label for="email">Work email</label>
+    <input id="email" type="email" name="email" value="{{ email }}" autocomplete="email" required autofocus>
+  </div>
+  <div class="field">
+    <label for="password">Password</label>
+    <div class="pw">
+      <input id="password" type="password" name="password" autocomplete="current-password" required>
+      <button type="button" data-toggle="password" aria-pressed="false">Show</button>
+    </div>
+  </div>
   <button class="btn wide">Sign in</button>
-  <small class="hint">First run? Use <b>admin@hrms.local</b> / <b>admin123</b>.</small>
-</form></body></html>
+</form>
+
+<p class="alt">New employee? <a href="{% url 'register' %}">Create your account</a></p>
+<p class="alt muted">Forgot your password? Ask your HR administrator to reset your login.</p>
+{% endblock %}
