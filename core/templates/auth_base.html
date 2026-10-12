@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Sign in{% endblock %} – Fewima Consulting</title>
+  <title>{% block title %}Sign in{% endblock %} – Fewima</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -16,7 +16,7 @@
      alt="Fewima"
      width="55"
      height="55"
-     style="border-radius: 50%; border: 3px solid #007bff; object-fit: cover;"><span>Fewima Consulting</span></a>
+     style="border-radius: 50%; border: 3px solid #007bff; object-fit: cover;"><span>Fewima</span></a>
     <div class="side-copy">
       <h2>Manage your people with confidence.</h2>
       <ul>
@@ -29,7 +29,7 @@
   </aside>
 
   <main class="main">
-    <a class="brand mobile-brand" href="{% url 'landing' %}"><span class="mark">F</span><span>Fewima Consulting</span></a>
+    <a class="brand mobile-brand" href="{% url 'landing' %}"><span class="mark">F</span><span>Fewima</span></a>
     <div class="box">
       {% for m in messages %}<div class="flash {{ m.tags }}" role="alert">{{ m }}</div>{% endfor %}
       {% block content %}{% endblock %}
