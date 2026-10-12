@@ -16,8 +16,8 @@ if DEBUG:
     SECURE_HSTS_SECONDS = 0
 else:
     # Production
-    ALLOWED_HOSTS = ["fewima.com", "www.fewima.com"]
-    CSRF_TRUSTED_ORIGINS = ["https://fewima.com", "https://www.fewima.com"]
+    ALLOWED_HOSTS = ["fewima.com", "www.fewima.com","fewima-web.onrender.com"]
+    CSRF_TRUSTED_ORIGINS = ["https://fewima.com", "https://www.fewima.com","https://fewima-web.onrender.com"]
 
     # Render's generated domain (e.g. fewima-web.onrender.com)
     RENDER_HOST = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
