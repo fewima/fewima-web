@@ -1,12 +1,14 @@
+# hrms/settings/prod.py
 import os
 
 from .base import *
 
-# Safe by default: only "1" turns debug on (set DEBUG=1 in your local .env)
-DEBUG = os.environ.get("DEBUG", "0") == "1"
+# Debug is only ever on locally. On Render (RENDER=true) it is always off.
+ON_RENDER = os.environ.get("RENDER") == "true"
+DEBUG = (not ON_RENDER) and os.environ.get("DEBUG", "0") == "1"
 
 if DEBUG:
-    # Localhost / development
+    # ---------- Local development ----------
     ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
     CSRF_TRUSTED_ORIGINS = ["http://localhost:8000", "http://127.0.0.1:8000"]
 
@@ -15,13 +17,21 @@ if DEBUG:
     CSRF_COOKIE_SECURE = False
     SECURE_HSTS_SECONDS = 0
 else:
-    # Production
-    ALLOWED_HOSTS = ["fewima.com", "www.fewima.com","fewima-web.onrender.com"]
-    CSRF_TRUSTED_ORIGINS = ["https://fewima.com", "https://www.fewima.com","https://fewima-web.onrender.com"]
+    # ---------- Production ----------
+    ALLOWED_HOSTS = [
+        "fewima.com",
+        "www.fewima.com",
+        "fewima-web.onrender.com",
+    ]
+    CSRF_TRUSTED_ORIGINS = [
+        "https://fewima.com",
+        "https://www.fewima.com",
+        "https://fewima-web.onrender.com",
+    ]
 
-    # Render's generated domain (e.g. fewima-web.onrender.com)
+    # Any other hostname Render assigns
     RENDER_HOST = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
-    if RENDER_HOST:
+    if RENDER_HOST and RENDER_HOST not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(RENDER_HOST)
         CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_HOST}")
 
@@ -45,12 +55,3 @@ STORAGES = {
     },
 }
 
-# LOGGING = {
-#     "version": 1,
-#     "disable_existing_loggers": False,
-#     "handlers": {"console": {"class": "logging.StreamHandler"}},
-#     "root": {"handlers": ["console"], "level": "INFO" if DEBUG else "WARNING"},
-#     "loggers": {
-#         "pymongo": {"level": "WARNING", "propagate": True},
-#     },
-# }
