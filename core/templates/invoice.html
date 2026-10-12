@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}Invoice {{ number }}{% endblock %}
+{% block content %}
+<style>@media print{.side,.noprint{display:none!important}}</style>
+<header class="head"><div><h1>Payroll invoice</h1><p>{{ number }} · {{ month }} · issued {{ issued }}</p></div>
+<button class="btn ghost noprint" onclick="window.print()">Print / Save as PDF</button></header>
+<div class="card flush table-wrap"><table>
+<thead><tr><th>Department</th><th class="r">Staff</th><th class="r">Gross</th><th class="r">Pension</th><th class="r">Tax</th><th class="r">Net payable</th></tr></thead>
+<tbody>{% for d in lines %}<tr><td>{{ d.name }}</td><td class="r">{{ d.n }}</td><td class="r">{{ currency }}{{ d.gross|floatformat:"2g" }}</td>
+  <td class="r">{{ currency }}{{ d.pension|floatformat:"2g" }}</td><td class="r">{{ currency }}{{ d.tax|floatformat:"2g" }}</td><td class="r">{{ currency }}{{ d.net|floatformat:"2g" }}</td></tr>{% endfor %}</tbody>
+<tfoot><tr><td><b>Total</b></td><td class="r">{{ totals.n }}</td><td class="r">{{ currency }}{{ totals.gross|floatformat:"2g" }}</td>
+  <td class="r">{{ currency }}{{ totals.pension|floatformat:"2g" }}</td><td class="r">{{ currency }}{{ totals.tax|floatformat:"2g" }}</td>
+  <td class="r"><b>{{ currency }}{{ totals.net|floatformat:"2g" }}</b></td></tr></tfoot></table></div>
+{% endblock %}

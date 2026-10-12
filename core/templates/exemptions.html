@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% block title %}Missed clock{% endblock %}
+{% block content %}
+<header class="head"><div><h1>Missed clock-in / out</h1>
+<p>You've used {{ used }} of {{ limit }} this month. Requests beyond {{ limit }} also need HR approval.</p></div>
+<a class="btn" href="{% url 'exemption_apply' %}">Apply for exemption</a></header>
+<div class="card flush table-wrap"><table>
+<thead><tr><th>Employee</th><th>Date</th><th>Missed</th><th>Times</th><th>Status</th><th></th></tr></thead>
+<tbody>{% for x in rows %}<tr>
+  <td><b>{{ x.name }}</b><small>{{ x.reason|truncatechars:70 }}</small></td>
+  <td>{{ x.date }}</td><td>{{ x.kind_label }}</td>
+  <td>{{ x.check_in|default:"–" }} to {{ x.check_out|default:"–" }}</td>
+  <td><span class="badge {{ x.status|slugify }}">{{ x.status }}</span>
+    {% if x.status == "Pending" %}<small>{% if x.stage == "supervisor" %}With supervisor{% else %}With HR{% endif %}</small>{% endif %}
+    {% if x.over_limit %}<small>Over monthly limit</small>{% endif %}</td>
+  <td class="r">{% if x.can_act %}
+    <form method="post" class="inline" action="{% url 'exemption_action' x.id 'approve' %}">{% csrf_token %}<button class="btn sm">Approve</button></form>
+    <form method="post" class="inline" action="{% url 'exemption_action' x.id 'reject' %}">{% csrf_token %}<button class="btn sm ghost">Reject</button></form>{% endif %}</td>
+</tr>{% empty %}<tr><td colspan="6" class="empty">No requests yet.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

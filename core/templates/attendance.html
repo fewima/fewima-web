@@ -2,16 +2,33 @@
 {% block content %}
 <header class="head"><div><h1>Attendance</h1><p>Arrivals after {{ late_after }} are marked late</p></div>
 <form method="get" class="inline"><input type="date" name="date" value="{{ day }}" onchange="this.form.submit()" aria-label="Date"></form></header>
+
+{% for n in notices %}<div class="card"><b>{{ n.title }}</b>{% if n.body %}<p>{{ n.body|linebreaksbr }}</p>{% endif %}
+  <small>{{ n.by }} · {{ n.created|slice:":10" }}</small>
+  {% if is_admin %}<form method="post" class="inline" action="{% url 'notice_delete' n.id %}">{% csrf_token %}<button class="link danger">Remove</button></form>{% endif %}</div>{% endfor %}
+{% if is_admin %}<details class="card"><summary>Post a notice</summary>
+  <form method="post" action="{% url 'notice_post' %}">{% csrf_token %}
+    <input name="title" placeholder="Title" required maxlength="120"><textarea name="body" rows="3" maxlength="1000" placeholder="Details"></textarea>
+    <button class="btn sm">Post notice</button></form></details>{% endif %}
+
 <div class="card clock"><div>
   {% if not mine %}<h2>You haven't clocked in today</h2>
+  {% elif mine.status == "On leave" %}<h2>You're on approved leave today</h2><p>{{ mine.leave_type }} leave</p>
   {% elif not mine.check_out %}<h2>Clocked in at {{ mine.check_in }}</h2>
-  {% else %}<h2>Done for the day</h2><p>{{ mine.check_in }} to {{ mine.check_out }}</p>{% endif %}</div>
-  {% if not mine or not mine.check_out %}<form method="post" action="{% url 'clock' %}">{% csrf_token %}
+  {% else %}<h2>Done for the day</h2><p>{{ mine.check_in }} to {{ mine.check_out }}</p>{% endif %}
+  <p><a class="link" href="{% url 'exemption_apply' %}">Forgot to clock? Apply for an exemption</a></p></div>
+  {% if not mine or not mine.check_out and mine.status != "On leave" %}<form method="post" action="{% url 'clock' %}">{% csrf_token %}
     <button class="btn big">{% if mine %}Clock out{% else %}Clock in{% endif %}</button></form>{% endif %}
 </div>
+
+<form method="get" action="{% url 'attendance_export' %}" class="filters">
+  <input type="date" name="from" value="{{ month_start }}" aria-label="From"><input type="date" name="to" value="{{ today }}" aria-label="To">
+  <button class="btn ghost">Download Excel</button></form>
+
 <div class="card flush table-wrap"><table>
 <thead><tr><th>Employee</th><th>Date</th><th>In</th><th>Out</th><th></th></tr></thead>
-<tbody>{% for a in rows %}<tr><td><b>{{ a.name }}</b></td><td>{{ a.date }}</td><td>{{ a.check_in }}</td><td>{{ a.check_out|default:"–" }}</td>
-  <td>{% if a.late %}<span class="badge late">Late</span>{% else %}<span class="badge on-time">On time</span>{% endif %}</td></tr>
+<tbody>{% for a in rows %}<tr><td><b>{{ a.name }}</b></td><td>{{ a.date }}</td><td>{{ a.check_in|default:"–" }}</td><td>{{ a.check_out|default:"–" }}</td>
+  <td>{% if a.status %}<span class="badge {{ a.status|slugify }}">{{ a.status }}</span>
+      {% elif a.late %}<span class="badge late">Late</span>{% else %}<span class="badge on-time">On time</span>{% endif %}</td></tr>
 {% empty %}<tr><td colspan="5" class="empty">No attendance recorded for {{ day }}.</td></tr>{% endfor %}</tbody></table></div>
 {% endblock %}

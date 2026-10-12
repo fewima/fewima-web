@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block title %}Payslip {{ s.month }}{% endblock %}
+{% block content %}
+<style>@media print{.side,.noprint{display:none!important}}</style>
+<header class="head"><div><h1>Payslip</h1><p>{{ s.month }}</p></div><button class="btn ghost noprint" onclick="window.print()">Print / Save as PDF</button></header>
+<div class="card">
+  <h2>Fewima</h2>
+  <p><b>{{ s.name }}</b><br>Work ID: {{ s.work_id|default:"–" }} · {{ s.position }} · {{ s.department }}</p>
+  <table>
+    <tr><td>Basic salary</td><td class="r">{{ currency }}{{ s.basic|floatformat:"2g" }}</td></tr>
+    <tr><td>Unpaid leave ({{ s.unpaid_days }} day{{ s.unpaid_days|pluralize }})</td><td class="r">-{{ currency }}{{ s.unpaid_deduction|floatformat:"2g" }}</td></tr>
+    <tr><td>Travel allowance</td><td class="r">{{ currency }}{{ s.pta|floatformat:"2g" }}</td></tr>
+    <tr><td><b>Gross pay</b></td><td class="r"><b>{{ currency }}{{ s.gross|floatformat:"2g" }}</b></td></tr>
+    <tr><td>Pension</td><td class="r">-{{ currency }}{{ s.pension|floatformat:"2g" }}</td></tr>
+    <tr><td>Tax</td><td class="r">-{{ currency }}{{ s.tax|floatformat:"2g" }}</td></tr>
+    <tr><td><b>Net pay</b></td><td class="r"><b>{{ currency }}{{ s.net|floatformat:"2g" }}</b></td></tr>
+  </table>
+</div>
+{% endblock %}

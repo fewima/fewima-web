@@ -4,9 +4,9 @@
 <h1>Welcome back</h1>
 <p class="sub">Sign in to your Fewima Consulting workspace.</p>
 
-{% if first %}
+{% comment %} {% if first %}
 <div class="flash info">No accounts exist yet. <a href="{% url 'register' %}">Create the administrator account</a> to get started.</div>
-{% endif %}
+{% endif %} {% endcomment %}
 
 <form method="post" novalidate>
   {% csrf_token %}

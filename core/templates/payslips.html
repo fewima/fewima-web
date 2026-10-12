@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}Payslips{% endblock %}
+{% block content %}
+<header class="head"><div><h1>My payslips</h1><p>Available once payroll is finalised</p></div></header>
+<div class="card flush table-wrap"><table>
+<thead><tr><th>Month</th><th class="r">Gross</th><th class="r">Net pay</th><th></th></tr></thead>
+<tbody>{% for r in rows %}<tr><td><b>{{ r.month }}</b></td><td class="r">{{ currency }}{{ r.gross|floatformat:"2g" }}</td>
+  <td class="r">{{ currency }}{{ r.net|floatformat:"2g" }}</td><td class="r"><a class="link" href="{% url 'payslip' r.id %}">View</a></td></tr>
+{% empty %}<tr><td colspan="4" class="empty">No payslips yet.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

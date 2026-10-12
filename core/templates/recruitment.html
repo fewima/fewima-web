@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% block title %}Recruitment{% endblock %}
+{% block content %}
+<header class="head"><div><h1>Recruitment</h1><p>1 Create · 2 Interview · 3 Hire and issue Work ID</p></div>
+<a class="btn" href="{% url 'candidate_add' %}">New candidate</a></header>
+<div class="tabs">{% for t in tabs %}<a href="?stage={{ t }}" class="{% if t == stage %}on{% endif %}">{{ t|default:"All" }}</a>{% endfor %}</div>
+<div class="card flush table-wrap"><table>
+<thead><tr><th>Candidate</th><th>Position</th><th>Stage</th><th>Interview record</th><th></th></tr></thead>
+<tbody>{% for c in rows %}<tr>
+  <td><b>{{ c.first_name }} {{ c.last_name }}</b><small>{{ c.email }} · added {{ c.created|slice:":10" }} by {{ c.created_by }}</small></td>
+  <td>{{ c.position }}<small>{{ c.department }}</small></td>
+  <td><span class="badge {{ c.stage|slugify }}">{{ c.stage }}</span>{% if c.work_id %}<small>Work ID {{ c.work_id }}</small>{% endif %}</td>
+  <td>{% if c.interviews %}<details><summary>{{ c.interviews|length }} interview{{ c.interviews|length|pluralize }}</summary>
+    {% for i in c.interviews %}<p><b>{{ i.round }}</b> · {{ i.date }} · {{ i.interviewer }} · {{ i.outcome }}{% if i.score != None %} · {{ i.score }}/10{% endif %}<br><small>{{ i.notes }}</small></p>{% endfor %}</details>{% else %}–{% endif %}</td>
+  <td class="r">{% if c.stage == "Applied" or c.stage == "Interview" %}
+    <a class="link" href="{% url 'interview_add' c.id %}">Record interview</a>
+    {% if c.stage == "Interview" %}<form method="post" class="inline" action="{% url 'candidate_decide' c.id 'hire' %}" onsubmit="return confirm('Hire {{ c.first_name|escapejs }} {{ c.last_name|escapejs }}? This creates the employee record and Work ID.')">{% csrf_token %}<button class="btn sm">Hire</button></form>{% endif %}
+    <form method="post" class="inline" action="{% url 'candidate_decide' c.id 'reject' %}" onsubmit="return confirm('Reject this candidate?')">{% csrf_token %}<button class="link danger">Reject</button></form>{% endif %}</td>
+</tr>{% empty %}<tr><td colspan="5" class="empty">No candidates yet.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

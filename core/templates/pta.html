@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block title %}Travel allowance{% endblock %}
+{% block content %}
+<header class="head"><div><h1>Personal travel allowance</h1><p>Approved amounts are added to that month's payslip</p></div>
+<a class="btn" href="{% url 'pta_apply' %}">Apply for PTA</a></header>
+<div class="card flush table-wrap"><table>
+<thead><tr><th>Employee</th><th>Month</th><th>Destination</th><th class="r">Amount</th><th>Status</th><th></th></tr></thead>
+<tbody>{% for p in rows %}<tr>
+  <td><b>{{ p.name }}</b><small>{{ p.purpose|truncatechars:70 }}</small></td>
+  <td>{{ p.month }}</td><td>{{ p.destination }}</td><td class="r">{{ currency }}{{ p.amount|floatformat:"2g" }}</td>
+  <td><span class="badge {{ p.status|slugify }}">{{ p.status }}</span>
+    {% if p.status == "Pending" %}<small>{% if p.stage == "supervisor" %}With supervisor{% else %}With HR{% endif %}</small>{% endif %}</td>
+  <td class="r">{% if p.can_act %}
+    <form method="post" class="inline" action="{% url 'pta_action' p.id 'approve' %}">{% csrf_token %}<button class="btn sm">Approve</button></form>
+    <form method="post" class="inline" action="{% url 'pta_action' p.id 'reject' %}">{% csrf_token %}<button class="btn sm ghost">Reject</button></form>{% endif %}</td>
+</tr>{% empty %}<tr><td colspan="6" class="empty">No travel allowance requests.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

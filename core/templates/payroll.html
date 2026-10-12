@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% block title %}Payroll{% endblock %}
+{% block content %}
+<header class="head"><div><h1>Payroll</h1><p>{{ month }} · {% if final %}Final{% elif rows %}Draft{% else %}Not generated yet{% endif %}</p></div>
+<form method="get" class="inline"><input type="month" name="month" value="{{ month }}" onchange="this.form.submit()" aria-label="Month"></form></header>
+<div class="row">
+  {% if not final %}<form method="post" class="inline" action="{% url 'payroll_run' %}">{% csrf_token %}<input type="hidden" name="month" value="{{ month }}">
+    <button class="btn">{% if rows %}Recalculate{% else %}Generate payroll{% endif %}</button></form>{% endif %}
+  {% if rows and not final and is_admin %}<form method="post" class="inline" action="{% url 'payroll_finalize' %}" onsubmit="return confirm('Finalise {{ month }}? Payslips become visible to employees and can no longer be recalculated.')">{% csrf_token %}
+    <input type="hidden" name="month" value="{{ month }}"><button class="btn ghost">Finalise</button></form>{% endif %}
+  {% if rows %}<a class="btn ghost" href="{% url 'payroll_export' %}?month={{ month }}">Download Excel</a>
+    <a class="btn ghost" href="{% url 'invoice' month %}">Invoice</a>{% endif %}
+</div>
+<div class="card flush table-wrap"><table>
+<thead><tr><th>Employee</th><th class="r">Basic</th><th class="r">Unpaid leave</th><th class="r">Travel</th><th class="r">Gross</th><th class="r">Pension</th><th class="r">Tax</th><th class="r">Net</th><th></th></tr></thead>
+<tbody>{% for r in rows %}<tr>
+  <td><b>{{ r.name }}</b><small>{{ r.work_id }} · {{ r.department }}</small></td>
+  <td class="r">{{ currency }}{{ r.basic|floatformat:"2g" }}</td><td class="r">{{ currency }}{{ r.unpaid_deduction|floatformat:"2g" }}</td>
+  <td class="r">{{ currency }}{{ r.pta|floatformat:"2g" }}</td><td class="r">{{ currency }}{{ r.gross|floatformat:"2g" }}</td>
+  <td class="r">{{ currency }}{{ r.pension|floatformat:"2g" }}</td><td class="r">{{ currency }}{{ r.tax|floatformat:"2g" }}</td>
+  <td class="r"><b>{{ currency }}{{ r.net|floatformat:"2g" }}</b></td><td class="r"><a class="link" href="{% url 'payslip' r.id %}">Payslip</a></td>
+</tr>{% empty %}<tr><td colspan="9" class="empty">No payroll for {{ month }}.</td></tr>{% endfor %}</tbody>
+{% if rows %}<tfoot><tr><td><b>Total</b></td><td class="r">{{ currency }}{{ totals.basic|floatformat:"2g" }}</td><td class="r">{{ currency }}{{ totals.unpaid_deduction|floatformat:"2g" }}</td>
+  <td class="r">{{ currency }}{{ totals.pta|floatformat:"2g" }}</td><td class="r">{{ currency }}{{ totals.gross|floatformat:"2g" }}</td>
+  <td class="r">{{ currency }}{{ totals.pension|floatformat:"2g" }}</td><td class="r">{{ currency }}{{ totals.tax|floatformat:"2g" }}</td>
+  <td class="r"><b>{{ currency }}{{ totals.net|floatformat:"2g" }}</b></td><td></td></tr></tfoot>{% endif %}
+</table></div>
+{% endblock %}

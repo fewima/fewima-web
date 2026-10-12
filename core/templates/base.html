@@ -17,6 +17,11 @@
     <a href="{% url 'departments' %}" class="{% if nav == 'departments' %}on{% endif %}">Departments</a>
     <a href="{% url 'leaves' %}" class="{% if nav == 'leaves' %}on{% endif %}">Leave</a>
     <a href="{% url 'attendance' %}" class="{% if nav == 'attendance' %}on{% endif %}">Attendance</a>
+    <a href="{% url 'exemptions' %}" class="{% if nav == 'exemptions' %}on{% endif %}">Missed clock</a>
+    <a href="{% url 'pta' %}" class="{% if nav == 'pta' %}on{% endif %}">Travel allowance</a>
+    <a href="{% url 'payslips' %}" class="{% if nav == 'payslips' %}on{% endif %}">Payslips</a>
+    {% if can_payroll %}<a href="{% url 'payroll' %}" class="{% if nav == 'payroll' %}on{% endif %}">Payroll</a>{% endif %}
+    {% if is_admin %}<a href="{% url 'recruitment' %}" class="{% if nav == 'recruitment' %}on{% endif %}">Recruitment</a>{% endif %}
   </nav>
   <div class="me">
     <b>{{ request.session.name }}</b><small>{{ request.session.role|title }}</small>

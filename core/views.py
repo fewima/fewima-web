@@ -4,6 +4,7 @@ import hmac
 import logging
 import re
 import time
+from calendar import monthrange
 from datetime import date, datetime, timedelta, timezone
 
 from django.conf import settings
@@ -22,13 +23,18 @@ from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from . import email_notifications as mail
-
 from .db import clean, db, oid
-from .forms import DepartmentForm, EmployeeForm, LeaveForm, RegisterForm
+from .forms import (CandidateForm, DepartmentForm, EmployeeForm, ExemptionForm,
+                    InterviewForm, LeaveForm, PTAForm, RegisterForm)
+from .policy import (EXEMPTION_LIMIT, EXEMPTION_WINDOW_DAYS, LEAVE_TYPES, PENSION_RATE,
+                     TAX_RATE, WORKING_DAYS_PER_MONTH)
+
 
 log = logging.getLogger("hrms.security")
 
 LATE_AFTER = "09:15"
+MONTH_RE = re.compile(r"\d{4}-(0[1-9]|1[0-2])")
+CANDIDATE_STAGES = ("Applied", "Interview", "Hired", "Rejected")
 
 # ---------- roles ----------
 ADMINISTRATOR, EMPLOYEE, SUPERVISOR, MANAGER, ACCOUNTANT = (
@@ -39,8 +45,6 @@ DEFAULT_ROLE = ADMINISTRATOR
 
 LEGACY_ROLES = {"admin": ADMINISTRATOR, "employee": EMPLOYEE}   # values from the old version
 ADMIN_VALUES = [ADMINISTRATOR, "admin"]                          # how admins may be stored in the DB
-# Administrators review everyone; a MANAGER reviews only the departments an administrator assigned to them.
-# (SUPERVISOR was removed from this set: supervisors are not tied to a department, so they can't be scoped.)
 REVIEW_ROLES = {ADMINISTRATOR, MANAGER}
 PAYROLL_ROLES = {ADMINISTRATOR, MANAGER, ACCOUNTANT}             # may see salaries / payroll totals
 
@@ -313,9 +317,12 @@ def can_see_pay(request):
     return getattr(request, "role", None) in PAYROLL_ROLES
 
 
-def page(request, template, nav, status=200, **ctx):
+def page(request, template, nav, status=200, filter_status=None, **ctx):
+    if filter_status is not None:
+        ctx["status"] = filter_status          # template variable, not the HTTP code
     ctx.update(nav=nav, currency=settings.CURRENCY, role=getattr(request, "role", None),
-               is_admin=is_admin(request), can_review=can_review(request), can_see_pay=can_see_pay(request))
+               is_admin=is_admin(request), can_review=can_review(request), can_see_pay=can_see_pay(request),
+               can_payroll=getattr(request, "role", None) in (ADMINISTRATOR, ACCOUNTANT))
     return render(request, template, ctx, status=status)
 
 
@@ -344,13 +351,15 @@ def team_emails(request):
 
 
 def scoped(request, include_self=True):
-    """Mongo filter on 'email' for attendance / leave records this user is allowed to see."""
     me = request.session["email"]
-    if not can_review(request):
-        return {"email": me}
-    team = team_emails(request)
-    if team is None:
+    if is_admin(request):
         return {}
+    if request.role == MANAGER:
+        team = team_emails(request)
+    elif request.role == SUPERVISOR:
+        team = {e["email"] for e in db().employees.find({"supervisor_email": me}, {"email": 1})}
+    else:
+        return {"email": me}
     team.add(me) if include_self else team.discard(me)
     return {"email": {"$in": sorted(team)}}
 
@@ -367,6 +376,138 @@ def manager_candidates():
 
 def departments_run_by(email):
     return [d["name"] for d in db().departments.find({"manager_email": email}, {"name": 1})]
+
+
+# ---------- approval workflow: employee -> supervisor -> HR ----------
+def supervisor_of(email):
+    e = db().employees.find_one({"email": email}, {"supervisor_email": 1}) or {}
+    sup = e.get("supervisor_email", "")
+    if sup and sup != email and db().employees.find_one({"email": sup, "status": "Active", "role": SUPERVISOR}):
+        return sup
+    return ""                                                   # no supervisor -> goes straight to HR
+
+
+def new_request(request, **fields):
+    me, sup = request.session["email"], supervisor_of(request.session["email"])
+    return {"email": me, "name": request.session["name"], "status": "Pending",
+            "stage": "supervisor" if sup else "hr", "supervisor_email": sup,
+            "created": datetime.now().isoformat(timespec="seconds"), **fields}
+
+
+def can_act(request, doc):
+    """Is this request waiting for the current user?"""
+    me = request.session["email"]
+    if doc.get("status") != "Pending" or doc["email"] == me:
+        return False
+    if doc.get("stage", "hr") == "supervisor":                  # legacy docs without 'stage' are HR's
+        return request.role == SUPERVISOR and doc.get("supervisor_email") == me
+    return is_admin(request)
+
+
+def awaiting(request):
+    """Mongo filter for requests waiting on this user (None if they approve nothing)."""
+    me = request.session["email"]
+    if request.role == SUPERVISOR:
+        return {"status": "Pending", "stage": "supervisor", "supervisor_email": me, "email": {"$ne": me}}
+    if is_admin(request):
+        return {"status": "Pending", "stage": {"$in": ["hr", None]}, "email": {"$ne": me}}
+    return None
+
+
+def decide(request, col, pk, action, label, on_final=None, back="dashboard"):
+    status = {"approve": "Approved", "reject": "Rejected"}.get(action)
+    if not status:
+        raise Http404
+    c = db()[col]
+    doc = c.find_one({"_id": get_oid(pk)})
+    if not doc:
+        messages.error(request, f"That {label} no longer exists.")
+    elif doc["status"] != "Pending":
+        messages.info(request, f"That {label} was already {doc['status'].lower()}.")
+    elif doc["email"] == request.session["email"]:
+        messages.error(request, f"You can't review your own {label}.")
+    elif not can_act(request, doc):
+        audit(request, "access_denied", f"{col} of {doc['email']}")
+        messages.error(request, "That request isn't waiting for your approval.")
+    else:
+        stage, now = doc.get("stage", "hr"), datetime.now().isoformat(timespec="seconds")
+        step = {f"{stage}_by": request.session["name"], f"{stage}_at": now}
+        if status == "Rejected":
+            upd = {"status": "Rejected", "stage": "done", **step}
+        elif stage == "supervisor" and doc.get("needs_hr", True):
+            upd = {"stage": "hr", **step}                       # supervisor ok -> now HR
+        else:
+            upd = {"status": "Approved", "stage": "done", **step}
+        flt = {"_id": doc["_id"], "status": "Pending"}          # atomic: no double decisions
+        if "stage" in doc:
+            flt["stage"] = doc["stage"]
+        if c.update_one(flt, {"$set": upd}).modified_count:
+            audit(request, f"{col}_{action}_{stage}", f"{doc['email']}")
+            if upd.get("status") == "Approved" and on_final:
+                on_final({**doc, **upd})
+            if upd.get("stage") == "hr":
+                messages.success(request, "Approved. It is now waiting for HR.")
+            else:
+                messages.success(request, f"{doc['name']}'s {label} was {status.lower()}.")
+        else:
+            messages.info(request, "Someone else already decided that request.")
+    return safe_redirect(request, request.POST.get("next"), back)
+
+
+def weekdays(start, end):
+    d = start
+    while d <= end:
+        if d.weekday() < 5:
+            yield d
+        d += timedelta(days=1)
+
+
+def month_str(d=None):
+    return (d or date.today()).strftime("%Y-%m")
+
+
+def month_bounds(m):
+    y, mo = map(int, m.split("-"))
+    return date(y, mo, 1), date(y, mo, monthrange(y, mo)[1])
+
+
+def parse_day(raw, default):
+    try:
+        return date.fromisoformat(raw).isoformat()
+    except (TypeError, ValueError):
+        return default
+
+
+def xlsx_response(filename, headers, rows):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    wb = Workbook()
+    ws = wb.active
+    ws.append(headers)
+    for r in rows:
+        ws.append(r)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+    for row in ws.iter_rows():
+        for cell in row:
+            if cell.data_type == "f":                           # stop user text like "=1+1" becoming a formula
+                cell.data_type = "s"
+    for col in ws.columns:
+        ws.column_dimensions[col[0].column_letter].width = min(40, max(len(str(c.value or "")) for c in col) + 2)
+    resp = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    wb.save(resp)
+    return resp
+
+
+def leave_to_attendance(l):
+    """HR approved: mark every working day of the leave as present ('On leave'). Real clock records are kept."""
+    for d in weekdays(date.fromisoformat(l["start_date"]), date.fromisoformat(l["end_date"])):
+        db().attendance.update_one(
+            {"email": l["email"], "date": d.isoformat()},
+            {"$setOnInsert": {"name": l["name"], "check_in": "", "check_out": "", "status": "On leave",
+                              "leave_type": l["leave_type"], "leave_id": str(l["_id"])}},
+            upsert=True)
 
 
 def department_manager(dep_name):
@@ -391,6 +532,7 @@ def seed():
     d.departments.create_index("name", unique=True)
     d.throttle.create_index("expires", expireAfterSeconds=0)
     d.audit_log.create_index("time")
+    d.payroll.create_index([("month", 1), ("email", 1)], unique=True)
     try:
         d.attendance.create_index([("email", 1), ("date", 1)], unique=True)
     except Exception:
@@ -648,6 +790,11 @@ def employee_edit(request, pk=None):
         if not doc:
             raise Http404
     form = EmployeeForm(request.POST or None, initial=doc)
+
+    form.fields["supervisor_email"].choices = [("", "No supervisor")] + [
+        (s["email"], f"{s['first_name']} {s['last_name']}")
+        for s in db().employees.find({"status": "Active", "role": SUPERVISOR}).sort("first_name", 1)]
+
     if request.method == "POST" and form.is_valid():
         data = dict(form.cleaned_data)
         for k, v in data.items():
@@ -842,8 +989,12 @@ def leaves(request):
     f = scoped(request)
     if status:
         f["status"] = status
-    rows = [clean(l) for l in db().leaves.find(f).sort("created", -1).limit(500)]
-    return page(request, "leaves.html", "leaves", rows=rows, status=status,
+    rows = []
+    for l in db().leaves.find(f).sort("created", -1).limit(500):
+        l = clean(l)
+        l["can_act"] = can_act(request, l)
+        rows.append(l)
+    return page(request, "leaves.html", "leaves", rows=rows, filter_status=status,
                 tabs=["", *LEAVE_STATUSES])
 
 
@@ -853,9 +1004,10 @@ def leave_apply(request):
     if request.method == "POST" and form.is_valid():
         c, me = form.cleaned_data, request.session["email"]
         start, end, reason = c["start_date"], c["end_date"], (c.get("reason") or "").strip()
+        days = (end - start).days + 1
         if end < start:
             form.add_error("end_date", "End date can't be before the start date.")
-        elif (end - start).days + 1 > 365:
+        elif days > 365:
             form.add_error("end_date", "A single request can't exceed 365 days.")
         if start < date.today() - timedelta(days=30):
             form.add_error("start_date", "Start date can't be more than 30 days in the past.")
@@ -864,6 +1016,14 @@ def leave_apply(request):
         if len(reason) > 1000:
             form.add_error("reason", "Keep the reason under 1000 characters.")
         if not form.errors:
+            cap = LEAVE_TYPES.get(c["leave_type"])
+            if cap is not None:                                 # yearly entitlement per leave type
+                used = sum(x["days"] for x in db().leaves.find(
+                    {"email": me, "leave_type": c["leave_type"], "status": {"$in": ["Pending", "Approved"]},
+                     "start_date": {"$gte": f"{start.year}-01-01", "$lte": f"{start.year}-12-31"}}, {"days": 1}))
+                if used + days > cap:
+                    form.add_error("leave_type", f"{c['leave_type']} leave allows {cap} days a year; you have {max(cap - used, 0)} left.")
+        if not form.errors:
             if db().leaves.count_documents({"email": me, "status": "Pending"}) >= 10:
                 form.add_error(None, "You have too many pending requests. Wait for a decision first.")
             elif db().leaves.find_one({"email": me, "status": {"$in": ["Pending", "Approved"]},
@@ -871,47 +1031,22 @@ def leave_apply(request):
                                        "end_date": {"$gte": start.isoformat()}}):
                 form.add_error(None, "These dates overlap another pending or approved request.")
         if not form.errors:
-            days = (end - start).days + 1
-            db().leaves.insert_one({
-                "email": me, "name": request.session["name"],
-                "leave_type": c["leave_type"], "start_date": start.isoformat(),
-                "end_date": end.isoformat(), "days": days,
-                "reason": reason, "status": "Pending",
-                "created": datetime.now().isoformat(timespec="seconds")})
+            db().leaves.insert_one(new_request(
+                request, leave_type=c["leave_type"], start_date=start.isoformat(), end_date=end.isoformat(),
+                days=days, reason=reason, needs_hr=True))
             audit(request, "leave_requested", f"{start}..{end}")
+            who = "your supervisor" if supervisor_of(me) else "HR"
             messages.success(request, f"Leave request submitted: {days} day{'s' if days != 1 else ''} "
-                                      f"({start:%d %b %Y} to {end:%d %b %Y}). It is now pending approval.")
+                                      f"({start:%d %b %Y} to {end:%d %b %Y}). It is now with {who}.")
             return redirect("leaves")
     return page(request, "form.html", "leaves", status=form_feedback(request, form), form=form, back="leaves",
                 title="Request leave", save="Submit request")
 
 
-@review_required
+@login_required
 @require_POST
 def leave_action(request, pk, action):
-    status = {"approve": "Approved", "reject": "Rejected"}.get(action)
-    if not status:
-        raise Http404
-    l = db().leaves.find_one({"_id": get_oid(pk)})
-    if not l:
-        messages.error(request, "That request no longer exists.")
-    elif not can_manage(request, l["email"]):
-        audit(request, "access_denied", f"leave of {l['email']}")
-        messages.error(request, "That employee isn't in a department you manage.")
-    elif l["status"] != "Pending":
-        messages.info(request, f"That request was already {l['status'].lower()}.")
-    elif l["email"] == request.session["email"]:
-        messages.error(request, "You can't review your own request. Ask another approver.")
-    else:
-        res = db().leaves.update_one({"_id": l["_id"], "status": "Pending"},   # atomic: no double decisions
-                                     {"$set": {"status": status, "reviewed_by": request.session["name"],
-                                               "reviewed_at": datetime.now().isoformat(timespec="seconds")}})
-        if res.modified_count:
-            audit(request, f"leave_{action}", f"{l['email']} {l['start_date']}..{l['end_date']}")
-            messages.success(request, f"{l['name']}'s leave request ({l['start_date']} to {l['end_date']}) was {status.lower()}.")
-        else:
-            messages.info(request, "Someone else already decided that request.")
-    return safe_redirect(request, request.POST.get("next"), "leaves")
+    return decide(request, "leaves", pk, action, "leave request", leave_to_attendance, "leaves")
 
 
 # ---------- attendance ----------
@@ -924,13 +1059,14 @@ def attendance(request):
     except ValueError:
         day = today
         messages.warning(request, "That date wasn't valid, so today's attendance is shown.")
-    f = {"date": day, **scoped(request)}
     rows = []
-    for a in db().attendance.find(f).sort("check_in", 1).limit(1000):
+    for a in db().attendance.find({"date": day, **scoped(request)}).sort("check_in", 1).limit(1000):
         a["late"] = bool(a.get("check_in")) and a["check_in"] > LATE_AFTER
         rows.append(clean(a))
     mine = db().attendance.find_one({"email": request.session["email"], "date": today})
-    return page(request, "attendance.html", "attendance", rows=rows, day=day, today=today, mine=mine, late_after=LATE_AFTER)
+    notices = [clean(n) for n in db().notices.find().sort("created", -1).limit(5)]
+    return page(request, "attendance.html", "attendance", rows=rows, day=day, today=today, mine=mine,
+                late_after=LATE_AFTER, notices=notices, month_start=today[:8] + "01")
 
 
 @login_required
@@ -938,6 +1074,9 @@ def attendance(request):
 def clock(request):
     now, today, email = datetime.now().strftime("%H:%M"), date.today().isoformat(), request.session["email"]
     rec = db().attendance.find_one({"email": email, "date": today})
+    if rec and rec.get("status") == "On leave":                 # approved leave counts as present
+        messages.info(request, "You're on approved leave today, so there's nothing to clock.")
+        return redirect("attendance")
     if not rec:
         try:
             db().attendance.insert_one({"email": email, "name": request.session["name"], "date": today,
@@ -955,3 +1094,364 @@ def clock(request):
     else:
         messages.info(request, "You've already completed today's attendance.")
     return redirect("attendance")
+
+
+@login_required
+def attendance_export(request):
+    today = date.today()
+    start = parse_day(request.GET.get("from"), today.replace(day=1).isoformat())
+    end = parse_day(request.GET.get("to"), today.isoformat())
+    out = []
+    for a in db().attendance.find({"date": {"$gte": start, "$lte": end}, **scoped(request)}) \
+            .sort([("date", 1), ("name", 1)]).limit(20000):
+        ci = a.get("check_in") or ""
+        out.append([a["date"], a.get("name", ""), a["email"], ci, a.get("check_out") or "",
+                    a.get("status") or ("Late" if ci > LATE_AFTER else "On time")])
+    audit(request, "attendance_export", f"{start}..{end}")
+    return xlsx_response(f"attendance_{start}_to_{end}.xlsx",
+                         ["Date", "Name", "Email", "In", "Out", "Status"], out)
+
+
+@admin_required
+@require_POST
+def notice_post(request):
+    title, body = request.POST.get("title", "").strip()[:120], request.POST.get("body", "").strip()[:1000]
+    if not title:
+        messages.error(request, "A notice needs a title.")
+    else:
+        db().notices.insert_one({"title": title, "body": body, "by": request.session["name"],
+                                 "created": datetime.now().isoformat(timespec="seconds")})
+        audit(request, "notice_posted", title)
+        messages.success(request, "Notice posted on the attendance page.")
+    return redirect("attendance")
+
+
+@admin_required
+@require_POST
+def notice_delete(request, pk):
+    db().notices.delete_one({"_id": get_oid(pk)})
+    audit(request, "notice_deleted", pk)
+    return redirect("attendance")
+
+
+# ---------- exemptions ----------
+def exemptions_used(email, month):
+    return db().exemptions.count_documents({"email": email, "month": month, "status": {"$in": ["Pending", "Approved"]}})
+
+
+def exemption_to_attendance(x):
+    fix = {k: x[k] for k in ("check_in", "check_out") if x.get(k)}
+    db().attendance.update_one({"email": x["email"], "date": x["date"]},
+                               {"$set": {**fix, "status": "Exempted"}, "$setOnInsert": {"name": x["name"]}},
+                               upsert=True)
+
+
+@login_required
+def exemptions(request):
+    rows = []
+    for x in db().exemptions.find(scoped(request)).sort("created", -1).limit(500):
+        x = clean(x)
+        x["can_act"] = can_act(request, x)
+        rows.append(x)
+    return page(request, "exemptions.html", "exemptions", rows=rows,
+                used=exemptions_used(request.session["email"], month_str()), limit=EXEMPTION_LIMIT)
+
+
+@login_required
+def exemption_apply(request):
+    form = ExemptionForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        c, me = form.cleaned_data, request.session["email"]
+        day, kind = c["date"], c["kind"]
+        if day > date.today():
+            form.add_error("date", "You can't apply for a future date.")
+        elif day < date.today() - timedelta(days=EXEMPTION_WINDOW_DAYS):
+            form.add_error("date", f"Requests must be made within {EXEMPTION_WINDOW_DAYS} days.")
+        if kind in ("in", "both") and not c.get("check_in"):
+            form.add_error("check_in", "Enter the time you arrived.")
+        if kind in ("out", "both") and not c.get("check_out"):
+            form.add_error("check_out", "Enter the time you left.")
+        if not form.errors and db().exemptions.find_one(
+                {"email": me, "date": day.isoformat(), "status": {"$in": ["Pending", "Approved"]}}):
+            form.add_error("date", "You already have a request for that day.")
+        if not form.errors:
+            month = day.strftime("%Y-%m")
+            over = exemptions_used(me, month) >= EXEMPTION_LIMIT
+            db().exemptions.insert_one(new_request(
+                request, date=day.isoformat(), month=month, kind=kind,
+                kind_label=dict(form.fields["kind"].choices)[kind],
+                check_in=c["check_in"].strftime("%H:%M") if c.get("check_in") else "",
+                check_out=c["check_out"].strftime("%H:%M") if c.get("check_out") else "",
+                reason=c["reason"].strip(), over_limit=over, needs_hr=over))
+            audit(request, "exemption_requested", f"{day} ({kind})")
+            if over:
+                messages.warning(request, f"You've passed the {EXEMPTION_LIMIT} exemptions allowed for {month}. "
+                                          f"This one needs supervisor and HR approval.")
+            else:
+                messages.success(request, "Exemption request submitted.")
+            return redirect("exemptions")
+    return page(request, "form.html", "exemptions", status=form_feedback(request, form), form=form,
+                back="exemptions", title="Missed clock-in / out", save="Submit request")
+
+
+@login_required
+@require_POST
+def exemption_action(request, pk, action):
+    return decide(request, "exemptions", pk, action, "exemption request", exemption_to_attendance, "exemptions")
+
+
+# ---------- personal travel allowance ----------
+@login_required
+def pta(request):
+    rows = []
+    for p in db().pta.find(scoped(request)).sort("created", -1).limit(500):
+        p = clean(p)
+        p["can_act"] = can_act(request, p)
+        rows.append(p)
+    return page(request, "pta.html", "pta", rows=rows)
+
+
+@login_required
+def pta_apply(request):
+    form = PTAForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        c, me = form.cleaned_data, request.session["email"]
+        month = c["month"].strip()
+        if not MONTH_RE.fullmatch(month):
+            form.add_error("month", "Choose a valid month.")
+        elif month > month_str(date.today() + timedelta(days=31)):
+            form.add_error("month", "That month is too far ahead.")
+        elif db().pta.find_one({"email": me, "month": month, "status": {"$in": ["Pending", "Approved"]}}):
+            form.add_error("month", "You already have a travel allowance request for that month.")
+        if not form.errors:
+            db().pta.insert_one(new_request(
+                request, month=month, amount=float(c["amount"]), destination=c["destination"].strip(),
+                purpose=c["purpose"].strip(), needs_hr=True))
+            audit(request, "pta_requested", f"{month} {c['amount']}")
+            messages.success(request, "Travel allowance request submitted.")
+            return redirect("pta")
+    return page(request, "form.html", "pta", status=form_feedback(request, form), form=form, back="pta",
+                title="Apply for personal travel allowance", save="Submit request")
+
+
+@login_required
+@require_POST
+def pta_action(request, pk, action):
+    return decide(request, "pta", pk, action, "travel allowance request", None, "pta")
+
+
+# ---------- payroll ----------
+def build_payslip(emp, month):
+    first, last = month_bounds(month)
+    pta_total = sum(p["amount"] for p in db().pta.find(
+        {"email": emp["email"], "month": month, "status": "Approved"}, {"amount": 1}))
+    unpaid_days = 0
+    for l in db().leaves.find({"email": emp["email"], "status": "Approved", "leave_type": "Unpaid",
+                               "start_date": {"$lte": last.isoformat()}, "end_date": {"$gte": first.isoformat()}}):
+        s = max(date.fromisoformat(l["start_date"]), first)
+        e = min(date.fromisoformat(l["end_date"]), last)
+        unpaid_days += sum(1 for _ in weekdays(s, e))
+    basic = float(emp.get("salary", 0))                         # salary is treated as MONTHLY
+    unpaid = round(basic / WORKING_DAYS_PER_MONTH * unpaid_days, 2)
+    gross = round(basic - unpaid + pta_total, 2)
+    pension = round((basic - unpaid) * PENSION_RATE, 2)
+    tax = round(gross * TAX_RATE, 2)                            # replace with PAYE bands
+    return {"month": month, "email": emp["email"], "name": f"{emp['first_name']} {emp['last_name']}",
+            "work_id": emp.get("work_id", ""), "department": emp.get("department", ""),
+            "position": emp.get("position", ""), "basic": basic, "pta": pta_total,
+            "unpaid_days": unpaid_days, "unpaid_deduction": unpaid, "gross": gross,
+            "pension": pension, "tax": tax, "net": round(gross - pension - tax, 2)}
+
+
+@role_required(ADMINISTRATOR, ACCOUNTANT)
+def payroll(request):
+    month = request.GET.get("month", "")
+    month = month if MONTH_RE.fullmatch(month) else month_str()
+    rows = [clean(r) for r in db().payroll.find({"month": month}).sort("name", 1)]
+    totals = {k: sum(r[k] for r in rows) for k in ("basic", "pta", "unpaid_deduction", "gross", "pension", "tax", "net")}
+    final = bool(rows) and all(r["status"] == "Final" for r in rows)
+    return page(request, "payroll.html", "payroll", rows=rows, month=month, totals=totals, final=final)
+
+
+@role_required(ADMINISTRATOR, ACCOUNTANT)
+@require_POST
+def payroll_run(request):
+    month = request.POST.get("month", "")
+    if not MONTH_RE.fullmatch(month):
+        messages.error(request, "Choose a valid month.")
+        return redirect("payroll")
+    if db().payroll.find_one({"month": month, "status": "Final"}):
+        messages.error(request, f"Payroll for {month} is already finalised.")
+        return redirect(f"{request.path.rsplit('run/', 1)[0]}?month={month}")
+    now, n = datetime.now().isoformat(timespec="seconds"), 0
+    for emp in db().employees.find({"status": "Active"}):
+        db().payroll.update_one({"month": month, "email": emp["email"]},
+                                {"$set": {**build_payslip(emp, month), "status": "Draft",
+                                          "generated_by": request.session["name"], "generated_at": now}},
+                                upsert=True)
+        n += 1
+    audit(request, "payroll_generated", f"{month} ({n} employees)")
+    messages.success(request, f"Payroll for {month} generated for {n} employees.")
+    return redirect(f"{request.path.rsplit('run/', 1)[0]}?month={month}")
+
+
+@admin_required
+@require_POST
+def payroll_finalize(request):
+    month = request.POST.get("month", "")
+    if MONTH_RE.fullmatch(month):
+        res = db().payroll.update_many({"month": month, "status": "Draft"},
+                                       {"$set": {"status": "Final", "finalized_by": request.session["name"]}})
+        audit(request, "payroll_finalized", f"{month} ({res.modified_count})")
+        messages.success(request, f"Payroll for {month} is final. Payslips are now visible to employees.")
+    return redirect(f"{request.path.rsplit('finalize/', 1)[0]}?month={month}")
+
+
+@role_required(ADMINISTRATOR, ACCOUNTANT)
+def payroll_export(request):
+    month = request.GET.get("month", "")
+    if not MONTH_RE.fullmatch(month):
+        raise Http404
+    out = [[r.get("work_id", ""), r["name"], r["department"], r["basic"], r["unpaid_days"], r["unpaid_deduction"],
+            r["pta"], r["gross"], r["pension"], r["tax"], r["net"], r["status"]]
+           for r in db().payroll.find({"month": month}).sort("name", 1)]
+    audit(request, "payroll_export", month)
+    return xlsx_response(f"payroll_{month}.xlsx",
+                         ["Work ID", "Name", "Department", "Basic", "Unpaid days", "Unpaid deduction",
+                          "Travel allowance", "Gross", "Pension", "Tax", "Net", "Status"], out)
+
+
+@login_required
+def payslips(request):
+    rows = [clean(r) for r in db().payroll.find({"email": request.session["email"], "status": "Final"}).sort("month", -1)]
+    return page(request, "payslips.html", "payslips", rows=rows)
+
+
+@login_required
+def payslip(request, pk):
+    s = db().payroll.find_one({"_id": get_oid(pk)})
+    staff = request.role in (ADMINISTRATOR, ACCOUNTANT)
+    if not s or (not staff and (s["email"] != request.session["email"] or s["status"] != "Final")):
+        raise Http404                                           # don't reveal other people's payslips
+    audit(request, "payslip_viewed", f"{s['email']} {s['month']}")
+    return page(request, "payslip.html", "payslips", s=clean(s))
+
+
+@role_required(ADMINISTRATOR, ACCOUNTANT)
+def invoice(request, month):
+    if not MONTH_RE.fullmatch(month):
+        raise Http404
+    depts = {}
+    for r in db().payroll.find({"month": month}):
+        d = depts.setdefault(r.get("department") or "Unassigned",
+                             {"name": r.get("department") or "Unassigned", "n": 0, "gross": 0, "pension": 0, "tax": 0, "net": 0})
+        d["n"] += 1
+        for k in ("gross", "pension", "tax", "net"):
+            d[k] += r[k]
+    if not depts:
+        raise Http404
+    lines = sorted(depts.values(), key=lambda d: d["name"])
+    totals = {k: sum(d[k] for d in lines) for k in ("n", "gross", "pension", "tax", "net")}
+    return page(request, "invoice.html", "payroll", month=month, lines=lines, totals=totals,
+                number=f"INV-{month.replace('-', '')}", issued=date.today())
+
+
+# ---------- recruitment ----------
+def next_work_id():
+    n = db().counters.find_one_and_update({"_id": "work_id"}, {"$inc": {"n": 1}}, upsert=True,
+                                          return_document=ReturnDocument.AFTER)["n"]
+    return f"FEW-{n:04d}"
+
+
+@admin_required
+def recruitment(request):
+    stage = request.GET.get("stage", "")
+    f = {"stage": stage} if stage in CANDIDATE_STAGES else {}
+    rows = [clean(c) for c in db().candidates.find(f).sort("created", -1).limit(500)]
+    return page(request, "recruitment.html", "recruitment", rows=rows, stage=stage, tabs=["", *CANDIDATE_STAGES])
+
+
+@admin_required                                                  # STEP 1: create the candidate record
+def candidate_add(request):
+    form = CandidateForm(request.POST or None)
+    form.fields["department"].choices = [(d["name"], d["name"]) for d in db().departments.find().sort("name", 1)]
+    if request.method == "POST" and form.is_valid():
+        c = {k: (v.strip() if isinstance(v, str) else v) for k, v in form.cleaned_data.items()}
+        email = clean_email(c["email"])
+        if not email:
+            form.add_error("email", "Enter a valid email address.")
+        elif db().candidates.find_one({"email": email, "stage": {"$in": ["Applied", "Interview"]}}):
+            form.add_error("email", "This candidate is already in the pipeline.")
+        elif db().employees.find_one({"email": email}):
+            form.add_error("email", "An employee with this email already exists.")
+        if not form.errors:
+            c.update(email=email, expected_salary=float(c["expected_salary"]), stage="Applied", interviews=[],
+                     created=datetime.now().isoformat(timespec="seconds"), created_by=request.session["name"])
+            db().candidates.insert_one(c)
+            audit(request, "candidate_created", email)
+            messages.success(request, f"{c['first_name']} {c['last_name']} was added. Next: record an interview.")
+            return redirect("recruitment")
+    return page(request, "form.html", "recruitment", status=form_feedback(request, form), form=form,
+                back="recruitment", title="New candidate", save="Create candidate")
+
+
+@admin_required                                                  # STEP 2: record each interview
+def interview_add(request, pk):
+    cand = db().candidates.find_one({"_id": get_oid(pk)})
+    if not cand:
+        raise Http404
+    if cand["stage"] not in ("Applied", "Interview"):
+        messages.error(request, "This candidate is no longer in the interview process.")
+        return redirect("recruitment")
+    form = InterviewForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        c = form.cleaned_data
+        entry = {"round": c["round"], "date": c["date"].isoformat(), "interviewer": c["interviewer"].strip(),
+                 "outcome": c["outcome"], "score": c.get("score"), "notes": (c.get("notes") or "").strip(),
+                 "recorded_by": request.session["name"],
+                 "recorded_at": datetime.now().isoformat(timespec="seconds")}
+        db().candidates.update_one({"_id": cand["_id"], "stage": {"$in": ["Applied", "Interview"]}},
+                                   {"$push": {"interviews": entry}, "$set": {"stage": "Interview"}})
+        audit(request, "interview_recorded", f"{cand['email']} {c['round']} {c['outcome']}")
+        messages.success(request, f"{c['round']} interview recorded.")
+        return redirect("recruitment")
+    return page(request, "form.html", "recruitment", status=form_feedback(request, form), form=form,
+                back="recruitment", title=f"Interview: {cand['first_name']} {cand['last_name']}", save="Save interview")
+
+
+@admin_required                                                  # STEP 3: hire (creates employee + Work ID) or reject
+@require_POST
+def candidate_decide(request, pk, action):
+    cand = db().candidates.find_one({"_id": get_oid(pk)})
+    if not cand or action not in ("hire", "reject"):
+        raise Http404
+    now, who = datetime.now().isoformat(timespec="seconds"), request.session["name"]
+    if cand["stage"] not in ("Applied", "Interview"):
+        messages.info(request, "That candidate was already processed.")
+    elif action == "reject":
+        db().candidates.update_one({"_id": cand["_id"]}, {"$set": {"stage": "Rejected", "decided_by": who, "decided_at": now}})
+        audit(request, "candidate_rejected", cand["email"])
+        messages.success(request, "Candidate rejected.")
+    elif cand["stage"] != "Interview" or not any(i["outcome"] == "Pass" for i in cand.get("interviews", [])):
+        messages.error(request, "Record at least one passed interview before hiring.")
+    else:
+        work_id = next_work_id()
+        claim = db().candidates.update_one({"_id": cand["_id"], "stage": "Interview"},
+                                           {"$set": {"stage": "Hired", "work_id": work_id, "decided_by": who, "decided_at": now}})
+        if claim.modified_count:
+            data = {"first_name": cand["first_name"], "last_name": cand["last_name"], "email": cand["email"],
+                    "phone": cand.get("phone", ""), "department": cand["department"], "position": cand["position"],
+                    "hire_date": date.today().isoformat(), "salary": cand["expected_salary"],
+                    "status": "Active", "role": EMPLOYEE, "work_id": work_id, "supervisor_email": ""}
+            try:
+                db().employees.insert_one(data)
+            except DuplicateKeyError:
+                db().candidates.update_one({"_id": cand["_id"]}, {"$set": {"stage": "Interview"}, "$unset": {"work_id": ""}})
+                messages.error(request, "An employee with this email already exists.")
+            else:
+                audit(request, "candidate_hired", f"{cand['email']} {work_id}")
+                _, mgr = department_manager(data["department"])
+                mail.employee_welcome(data, mgr)
+                messages.success(request, f"{cand['first_name']} {cand['last_name']} was hired. Work ID: {work_id}. "
+                                          f"A welcome e-mail with registration instructions was sent.")
+    return redirect("recruitment")
