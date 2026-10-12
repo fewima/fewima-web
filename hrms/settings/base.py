@@ -17,6 +17,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "csp.middleware.CSPMiddleware",
 ]
 ROOT_URLCONF = "hrms.urls"
 TEMPLATES = [{
