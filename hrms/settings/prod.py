@@ -1,5 +1,8 @@
+import os
+
 from .base import *
 
+# Safe by default: only "1" turns debug on (set DEBUG=1 in your local .env)
 DEBUG = os.environ.get("DEBUG", "0") == "1"
 
 if DEBUG:
@@ -12,11 +15,17 @@ if DEBUG:
     CSRF_COOKIE_SECURE = False
     SECURE_HSTS_SECONDS = 0
 else:
-    # Production (fewima.com)
+    # Production
     ALLOWED_HOSTS = ["fewima.com", "www.fewima.com"]
     CSRF_TRUSTED_ORIGINS = ["https://fewima.com", "https://www.fewima.com"]
 
-    # HTTPS behind Nginx
+    # Render's generated domain (e.g. fewima-web.onrender.com)
+    RENDER_HOST = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
+    if RENDER_HOST:
+        ALLOWED_HOSTS.append(RENDER_HOST)
+        CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_HOST}")
+
+    # HTTPS behind Render's proxy
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
@@ -40,5 +49,8 @@ STORAGES = {
 #     "version": 1,
 #     "disable_existing_loggers": False,
 #     "handlers": {"console": {"class": "logging.StreamHandler"}},
-#     "root": {"handlers": ["console"], "level": "DEBUG" if DEBUG else "WARNING"},
+#     "root": {"handlers": ["console"], "level": "INFO" if DEBUG else "WARNING"},
+#     "loggers": {
+#         "pymongo": {"level": "WARNING", "propagate": True},
+#     },
 # }
