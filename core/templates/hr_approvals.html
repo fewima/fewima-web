@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>HR approvals</h1>
+<p>
+  {{ total }} request{{ total|pluralize }} waiting for HR.
+  {% if with_supervisor %}
+    <small>({{ with_supervisor }} more still with a supervisor.)</small>
+  {% endif %}
+</p>
+
+{% for s in sections %}
+<section style="margin-bottom:2rem">
+  <h2>{{ s.title }} <small>({{ s.rows|length }})</small></h2>
+
+  {% if s.rows %}
+  <div style="overflow-x:auto">
+  <table>
+    <thead>
+      <tr>
+        <th>Employee</th>
+        <th>Details</th>
+        <th>Reason / purpose</th>
+        <th>Submitted</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in s.rows %}
+      <tr>
+        <td>{{ r.name }}<br><small>{{ r.email }}</small></td>
+
+        <td>
+          {% if r.kind == "leave" %}
+            {{ r.leave_type }} leave<br>
+            {{ r.start_date }} to {{ r.end_date }} ({{ r.days }} day{{ r.days|pluralize }})
+          {% elif r.kind == "exemption" %}
+            {{ r.date }} &middot; {{ r.kind_label }}<br>
+            {% if r.check_in %}In: {{ r.check_in }} {% endif %}
+            {% if r.check_out %}Out: {{ r.check_out }}{% endif %}
+            {% if r.over_limit %}<br><strong>Over monthly limit</strong>{% endif %}
+          {% elif r.kind == "pta" %}
+            {{ r.month }}<br>
+            {{ currency }}{{ r.amount }} to {{ r.destination }}
+          {% endif %}
+        </td>
+
+        <td>
+          {% if r.kind == "pta" %}{{ r.purpose }}{% else %}{{ r.reason }}{% endif %}
+          {% if r.supervisor_by %}<br><small>Supervisor ok: {{ r.supervisor_by }}</small>{% endif %}
+        </td>
+
+        <td>{{ r.created|slice:":10" }}</td>
+
+        <td style="white-space:nowrap">
+          <form method="post" action="{% url 'hr_action' r.kind r.id 'approve' %}" style="display:inline">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit">Approve</button>
+          </form>
+          <form method="post" action="{% url 'hr_action' r.kind r.id 'reject' %}" style="display:inline"
+                onsubmit="return confirm('Reject this request?');">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit">Reject</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+    <p>Nothing waiting.</p>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

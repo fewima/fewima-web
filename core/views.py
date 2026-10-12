@@ -1009,8 +1009,7 @@ def leave_apply(request):
             form.add_error("end_date", "End date can't be before the start date.")
         elif days > 365:
             form.add_error("end_date", "A single request can't exceed 365 days.")
-        if start < date.today() - timedelta(days=30):
-            form.add_error("start_date", "Start date can't be more than 30 days in the past.")
+       
         if start > date.today() + timedelta(days=730):
             form.add_error("start_date", "Start date is too far in the future.")
         if len(reason) > 1000:
@@ -1455,3 +1454,47 @@ def candidate_decide(request, pk, action):
                 messages.success(request, f"{cand['first_name']} {cand['last_name']} was hired. Work ID: {work_id}. "
                                           f"A welcome e-mail with registration instructions was sent.")
     return redirect("recruitment")
+
+
+
+
+    # ---------- HR approvals (one page for every kind of pending request) ----------
+HR_KINDS = {
+    "leave": {"col": "leaves", "title": "Leave requests", "label": "leave request",
+              "on_final": leave_to_attendance},
+    "exemption": {"col": "exemptions", "title": "Missed clock-in / out", "label": "exemption request",
+                  "on_final": exemption_to_attendance},
+    "pta": {"col": "pta", "title": "Personal travel allowance", "label": "travel allowance request",
+            "on_final": None},
+}
+
+
+@admin_required
+def hr_approvals(request):
+    """Everything waiting for HR, across all request types."""
+    flt = awaiting(request)                       # admin: Pending, stage hr (or legacy no stage), not their own
+    sections, total = [], 0
+    for kind, cfg in HR_KINDS.items():
+        rows = []
+        for r in db()[cfg["col"]].find(flt).sort("created", 1).limit(200):
+            r = clean(r)
+            r["kind"] = kind
+            rows.append(r)
+        total += len(rows)
+        sections.append({"kind": kind, "title": cfg["title"], "rows": rows})
+    with_supervisor = sum(
+        db()[cfg["col"]].count_documents({"status": "Pending", "stage": "supervisor"})
+        for cfg in HR_KINDS.values())
+    return page(request, "hr_approvals.html", "hr_approvals",
+                sections=sections, total=total, with_supervisor=with_supervisor)
+
+
+@admin_required
+@require_POST
+def hr_action(request, kind, pk, action):
+    cfg = HR_KINDS.get(kind)
+    if not cfg:
+        raise Http404
+    return decide(request, cfg["col"], pk, action, cfg["label"], cfg["on_final"], "hr_approvals")
+
+

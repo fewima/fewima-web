@@ -43,4 +43,7 @@ urlpatterns = [
     path("recruitment/new/", v.candidate_add, name="candidate_add"),
     path("recruitment/<str:pk>/interview/", v.interview_add, name="interview_add"),
     path("recruitment/<str:pk>/<str:action>/", v.candidate_decide, name="candidate_decide"),
+
+    path("hr/approvals/", v.hr_approvals, name="hr_approvals"),
+    path("hr/approvals/<str:kind>/<str:pk>/<str:action>/", v.hr_action, name="hr_action"),
 ]
