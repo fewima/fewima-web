@@ -1,12 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>HR approvals</h1>
-<p>
-  {{ total }} request{{ total|pluralize }} waiting for HR.
-  {% if with_supervisor %}
-    <small>({{ with_supervisor }} more still with a supervisor.)</small>
-  {% endif %}
-</p>
+<p>{{ total }} pending request{{ total|pluralize }} from employees.</p>
 
 {% for s in sections %}
 <section style="margin-bottom:2rem">
@@ -20,6 +15,7 @@
         <th>Employee</th>
         <th>Details</th>
         <th>Reason / purpose</th>
+        <th>Currently with</th>
         <th>Submitted</th>
         <th>Action</th>
       </tr>
@@ -30,34 +26,39 @@
         <td>{{ r.name }}<br><small>{{ r.email }}</small></td>
 
         <td>
-          {% if r.kind == "leave" %}
+          {% if r.type == "leave" %}
             {{ r.leave_type }} leave<br>
             {{ r.start_date }} to {{ r.end_date }} ({{ r.days }} day{{ r.days|pluralize }})
-          {% elif r.kind == "exemption" %}
+          {% elif r.type == "exemption" %}
             {{ r.date }} &middot; {{ r.kind_label }}<br>
             {% if r.check_in %}In: {{ r.check_in }} {% endif %}
             {% if r.check_out %}Out: {{ r.check_out }}{% endif %}
             {% if r.over_limit %}<br><strong>Over monthly limit</strong>{% endif %}
-          {% elif r.kind == "pta" %}
+          {% elif r.type == "pta" %}
             {{ r.month }}<br>
             {{ currency }}{{ r.amount }} to {{ r.destination }}
           {% endif %}
         </td>
 
+        <td>{% if r.type == "pta" %}{{ r.purpose }}{% else %}{{ r.reason }}{% endif %}</td>
+
         <td>
-          {% if r.kind == "pta" %}{{ r.purpose }}{% else %}{{ r.reason }}{% endif %}
-          {% if r.supervisor_by %}<br><small>Supervisor ok: {{ r.supervisor_by }}</small>{% endif %}
+          {% if r.stage == "supervisor" %}
+            Supervisor<br><small>{{ r.supervisor_email }}</small>
+          {% else %}
+            HR{% if r.supervisor_by %}<br><small>Supervisor ok: {{ r.supervisor_by }}</small>{% endif %}
+          {% endif %}
         </td>
 
         <td>{{ r.created|slice:":10" }}</td>
 
         <td style="white-space:nowrap">
-          <form method="post" action="{% url 'hr_action' r.kind r.id 'approve' %}" style="display:inline">
+          <form method="post" action="{% url 'hr_action' r.type r.id 'approve' %}" style="display:inline">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.path }}">
             <button type="submit">Approve</button>
           </form>
-          <form method="post" action="{% url 'hr_action' r.kind r.id 'reject' %}" style="display:inline"
+          <form method="post" action="{% url 'hr_action' r.type r.id 'reject' %}" style="display:inline"
                 onsubmit="return confirm('Reject this request?');">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.path }}">

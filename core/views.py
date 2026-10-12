@@ -395,14 +395,15 @@ def new_request(request, **fields):
 
 
 def can_act(request, doc):
-    """Is this request waiting for the current user?"""
+    """Is this request waiting for the current user? HR (administrator) can act on any pending request."""
     me = request.session["email"]
     if doc.get("status") != "Pending" or doc["email"] == me:
         return False
-    if doc.get("stage", "hr") == "supervisor":                  # legacy docs without 'stage' are HR's
+    if is_admin(request):
+        return True
+    if doc.get("stage", "hr") == "supervisor":
         return request.role == SUPERVISOR and doc.get("supervisor_email") == me
-    return is_admin(request)
-
+    return False
 
 def awaiting(request):
     """Mongo filter for requests waiting on this user (None if they approve nothing)."""
@@ -412,6 +413,7 @@ def awaiting(request):
     if is_admin(request):
         return {"status": "Pending", "stage": {"$in": ["hr", None]}, "email": {"$ne": me}}
     return None
+
 
 
 def decide(request, col, pk, action, label, on_final=None, back="dashboard"):
@@ -430,14 +432,16 @@ def decide(request, col, pk, action, label, on_final=None, back="dashboard"):
         audit(request, "access_denied", f"{col} of {doc['email']}")
         messages.error(request, "That request isn't waiting for your approval.")
     else:
-        stage, now = doc.get("stage", "hr"), datetime.now().isoformat(timespec="seconds")
+        hr = is_admin(request)
+        stage = "hr" if hr else doc.get("stage", "hr")          # who is acting right now
+        now = datetime.now().isoformat(timespec="seconds")
         step = {f"{stage}_by": request.session["name"], f"{stage}_at": now}
         if status == "Rejected":
             upd = {"status": "Rejected", "stage": "done", **step}
         elif stage == "supervisor" and doc.get("needs_hr", True):
             upd = {"stage": "hr", **step}                       # supervisor ok -> now HR
         else:
-            upd = {"status": "Approved", "stage": "done", **step}
+            upd = {"status": "Approved", "stage": "done", **step}   # HR approval is always final
         flt = {"_id": doc["_id"], "status": "Pending"}          # atomic: no double decisions
         if "stage" in doc:
             flt["stage"] = doc["stage"]
@@ -452,7 +456,6 @@ def decide(request, col, pk, action, label, on_final=None, back="dashboard"):
         else:
             messages.info(request, "Someone else already decided that request.")
     return safe_redirect(request, request.POST.get("next"), back)
-
 
 def weekdays(start, end):
     d = start
@@ -1471,23 +1474,20 @@ HR_KINDS = {
 
 @admin_required
 def hr_approvals(request):
-    """Everything waiting for HR, across all request types."""
-    flt = awaiting(request)                       # admin: Pending, stage hr (or legacy no stage), not their own
+    """Every pending request from other employees, across all request types."""
+    me = request.session["email"]
+    flt = {"status": "Pending", "email": {"$ne": me}}           # HR can't review their own requests
     sections, total = [], 0
     for kind, cfg in HR_KINDS.items():
         rows = []
-        for r in db()[cfg["col"]].find(flt).sort("created", 1).limit(200):
-            r = clean(r)
-            r["kind"] = kind
+        for raw in db()[cfg["col"]].find(flt).sort("created", 1).limit(200):
+            r = clean(raw)
+            r["id"] = str(raw["_id"])                           # always available for the URL
+            r["type"] = kind                                    # 'kind' is already used by exemptions
             rows.append(r)
         total += len(rows)
         sections.append({"kind": kind, "title": cfg["title"], "rows": rows})
-    with_supervisor = sum(
-        db()[cfg["col"]].count_documents({"status": "Pending", "stage": "supervisor"})
-        for cfg in HR_KINDS.values())
-    return page(request, "hr_approvals.html", "hr_approvals",
-                sections=sections, total=total, with_supervisor=with_supervisor)
-
+    return page(request, "hr_approvals.html", "hr_approvals", sections=sections, total=total)
 
 @admin_required
 @require_POST
@@ -1496,5 +1496,3 @@ def hr_action(request, kind, pk, action):
     if not cfg:
         raise Http404
     return decide(request, cfg["col"], pk, action, cfg["label"], cfg["on_final"], "hr_approvals")
-
-
