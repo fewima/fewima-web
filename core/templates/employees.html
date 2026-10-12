@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% block title %}Employees{% endblock %}
 {% block content %}
 <header class="head"><div><h1>Employees</h1><p>{{ rows|length }} found</p></div>
-{% if request.session.role == "admin" %}<a class="btn" href="{% url 'employee_add' %}">Add employee</a>{% endif %}</header>
+{% if is_admin %}<a class="btn" href="{% url 'employee_add' %}">Add employee</a>{% endif %}</header>
 <form class="filters" method="get">
   <input name="q" value="{{ q }}" placeholder="Search by name, email or job title" aria-label="Search">
   <select name="department" onchange="this.form.submit()" aria-label="Department"><option value="">All departments</option>
@@ -9,13 +9,13 @@
   <button class="btn ghost">Search</button>
 </form>
 <div class="card flush table-wrap"><table>
-<thead><tr><th>Name</th><th>Department</th><th>Hired</th>{% if request.session.role == "admin" %}<th class="r">Salary</th>{% endif %}<th>Status</th><th></th></tr></thead>
+<thead><tr><th>Name</th><th>Department</th><th>Hired</th>{% if can_see_pay %}<th class="r">Salary</th>{% endif %}<th>Status</th><th></th></tr></thead>
 <tbody>{% for r in rows %}<tr>
   <td><div class="row tight"><span class="av">{{ r.first_name|first }}{{ r.last_name|first }}</span><div><b>{{ r.first_name }} {{ r.last_name }}</b><small>{{ r.position }} · {{ r.email }}</small></div></div></td>
   <td>{{ r.department }}</td><td>{{ r.hire_date }}</td>
-  {% if request.session.role == "admin" %}<td class="r">{{ currency }}{{ r.salary|floatformat:"0g" }}</td>{% endif %}
+  {% if can_see_pay %}<td class="r">{{ currency }}{{ r.salary|floatformat:"0g" }}</td>{% endif %}
   <td><span class="badge {{ r.status|slugify }}">{{ r.status }}</span></td>
-  <td class="r">{% if request.session.role == "admin" %}<a class="link" href="{% url 'employee_edit' r.id %}">Edit</a>
+  <td class="r">{% if is_admin %}<a class="link" href="{% url 'employee_edit' r.id %}">Edit</a>
     <form method="post" class="inline" action="{% url 'employee_reset' r.id %}" onsubmit="return confirm('Reset the login for {{ r.first_name|escapejs }} {{ r.last_name|escapejs }}? They will need to register again.')">{% csrf_token %}<button class="link">Reset login</button></form>
     <form method="post" class="inline" action="{% url 'employee_delete' r.id %}" onsubmit="return confirm('Remove {{ r.first_name|escapejs }} {{ r.last_name|escapejs }}? This also deletes their login.')">{% csrf_token %}<button class="link danger">Delete</button></form>{% endif %}</td>
 </tr>{% empty %}<tr><td colspan="6" class="empty">No employees match your search.</td></tr>{% endfor %}</tbody></table></div>

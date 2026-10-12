@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% block title %}Leave{% endblock %}
 {% block content %}
-<header class="head"><div><h1>Leave</h1><p>{% if request.session.role == "admin" %}Requests from everyone{% else %}Your requests{% endif %}</p></div>
+<header class="head"><div><h1>Leave</h1><p>{% if is_admin %}Requests from everyone{% elif can_review %}Your team's requests and your own{% else %}Your requests{% endif %}</p></div>
 <a class="btn" href="{% url 'leave_apply' %}">Request leave</a></header>
 <div class="tabs">{% for t in tabs %}<a href="?status={{ t }}" class="{% if t == status %}on{% endif %}">{{ t|default:"All" }}</a>{% endfor %}</div>
 <div class="card flush table-wrap"><table>
@@ -9,7 +9,7 @@
   <td><b>{{ l.name }}</b>{% if l.reason %}<small>{{ l.reason|truncatechars:70 }}</small>{% endif %}</td>
   <td>{{ l.leave_type }}</td><td>{{ l.start_date }} to {{ l.end_date }}</td><td class="r">{{ l.days }}</td>
   <td><span class="badge {{ l.status|slugify }}">{{ l.status }}</span></td>
-  <td class="r">{% if request.session.role == "admin" and l.status == "Pending" %}
+  <td class="r">{% if can_review and l.status == "Pending" and l.email != request.session.email %}
     <form method="post" class="inline" action="{% url 'leave_action' l.id 'approve' %}">{% csrf_token %}<button class="btn sm">Approve</button></form>
     <form method="post" class="inline" action="{% url 'leave_action' l.id 'reject' %}">{% csrf_token %}<button class="btn sm ghost">Reject</button></form>{% endif %}</td>
 </tr>{% empty %}<tr><td colspan="6" class="empty">No leave requests here.</td></tr>{% endfor %}</tbody></table></div>

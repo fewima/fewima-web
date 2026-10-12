@@ -760,8 +760,10 @@ def employee_delete(request, pk):
 # ---------- departments ----------
 @login_required
 def departments(request):
+    deps = managed_departments(request) if request.role == MANAGER else None
+    f = {} if deps is None else {"name": {"$in": deps}}
     rows = []
-    for dp in db().departments.find().sort("name", 1):
+    for dp in db().departments.find(f).sort("name", 1):
         dp["count"] = db().employees.count_documents({"department": dp["name"], "status": "Active"})
         rows.append(clean(dp))
     return page(request, "departments.html", "departments", rows=rows)
