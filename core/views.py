@@ -619,15 +619,14 @@ def register_view(request):
         seed()
         first = db().users.count_documents({}) == 0
     except Exception:
-        log.exception("MongoDB unreachable")
         messages.error(request, "The service is temporarily unavailable. Please try again shortly.")
         return render(request, "register.html", {"form": RegisterForm(first=False), "first": False}, status=503)
 
     form = RegisterForm(request.POST or None, first=first)
     if request.method == "POST":
-        if rl_hit("register-ip", client_ip(request), 10, 3600):
-            messages.error(request, "Too many registration attempts. Please try again in an hour.")
-            return render(request, "register.html", {"form": form, "first": first}, status=429)
+        # if rl_hit("register-ip", client_ip(request), 10, 3600):
+            # messages.error(request, "Too many registration attempts. Please try again in an hour.")
+            # return render(request, "register.html", {"form": form, "first": first}, status=429)
 
         if form.is_valid():
             c = form.cleaned_data
@@ -661,8 +660,7 @@ def register_view(request):
                             db().meta.insert_one({"_id": "bootstrap"})
                             claimed = True
                         except DuplicateKeyError:
-                            # A lock exists but there are no users: it's an orphan from a failed
-                            # earlier attempt (or a manually emptied users collection). Reclaim it.
+                          
                             if db().users.count_documents({}) == 0:
                                 db().meta.delete_one({"_id": "bootstrap"})
                                 db().meta.insert_one({"_id": "bootstrap"})
