@@ -611,38 +611,83 @@ def login_view(request):
 
 @db_safe
 def register_view(request):
+    """The first account becomes ADMINISTRATOR. After that only employees HR has added can register.
+    Every new account gets DEFAULT_ROLE (ADMINISTRATOR) unless HR set a role on the employee record."""
     if current_user(request):
         return redirect("dashboard")
+    try:
+        seed()
+        first = db().users.count_documents({}) == 0
+    except Exception:
+        messages.error(request, "The service is temporarily unavailable. Please try again shortly.")
+        return render(request, "register.html", {"form": RegisterForm(first=False), "first": False}, status=503)
 
-    seed()
-    first = db().users.count_documents({}) == 0
     form = RegisterForm(request.POST or None, first=first)
+    if request.method == "POST":
+        if rl_hit("register-ip", client_ip(request), 10, 3600):
+            messages.error(request, "Too many registration attempts. Please try again in an hour.")
+            return render(request, "register.html", {"form": form, "first": first}, status=429)
 
-    if request.method == "POST" and form.is_valid():
-        c = form.cleaned_data
-        email = clean_email(c.get("email"))
-        name, role = (c.get("name") or "").strip(), DEFAULT_ROLE
+        if form.is_valid():
+            c = form.cleaned_data
+            email = clean_email(c.get("email"))
+            name, role = (c.get("name") or "").strip(), DEFAULT_ROLE
+            if not email:
+                form.add_error("email", "Enter a valid email address.")
 
-        if not first:
-            emp = db().employees.find_one({"email": email})
-            if emp:
-                name = f"{emp['first_name']} {emp['last_name']}"
-                role = normalize_role(emp.get("role")) or DEFAULT_ROLE
+            code = getattr(settings, "REGISTRATION_INVITE_CODE", "")
+            if code and not hmac.compare_digest(request.POST.get("invite_code", "").encode(), code.encode()):
+                form.add_error(None, "A valid invitation code is required.")
 
-        try:
-            db().users.insert_one({
-                "email": email, "name": name, "role": role, "pwv": 0,
-                "password": make_password(c["password"]),
-                "created": datetime.now(timezone.utc).isoformat(timespec="seconds")})
-        except DuplicateKeyError:
-            form.add_error(None, "An account with this email already exists. Please sign in.")
-        else:
-            audit(request, "register", f"{email} as {role}", actor=email)
-            mail.account_created(email, name, role)
-            messages.success(request, f"Account created for {name}. You can now sign in.")
-            return redirect("login")
+            if email and not first:
+                emp = db().employees.find_one({"email": email})
+                if not emp or emp.get("status") == "Terminated":
+                    form.add_error("email", "Registration isn't available for this email. Ask HR to add you first.")
+                else:
+                    name = f"{emp['first_name']} {emp['last_name']}"
+                    role = normalize_role(emp.get("role")) or DEFAULT_ROLE
+            elif first and not NAME_RE.fullmatch(name):
+                form.add_error("name", "Enter your full name (2-100 characters, no special symbols).")
 
+            for p in password_problems(c.get("password", ""), email, name):
+                form.add_error("password", p)
+
+            if not form.errors:
+                claimed = False
+                try:
+                    if first:                                   # atomic claim: only one first-admin can ever win
+                        try:
+                            db().meta.insert_one({"_id": "bootstrap"})
+                            claimed = True
+                        except DuplicateKeyError:
+                            # A lock exists but there are no users: it's an orphan from a failed
+                            # earlier attempt (or a manually emptied users collection). Reclaim it.
+                            if db().users.count_documents({}) == 0:
+                                db().meta.delete_one({"_id": "bootstrap"})
+                                db().meta.insert_one({"_id": "bootstrap"})
+                                claimed = True
+                            else:
+                                raise
+                    db().users.insert_one({
+                        "email": email, "name": name, "role": role, "pwv": 0,
+                        "password": make_password(c["password"]),
+                        "created": datetime.now(timezone.utc).isoformat(timespec="seconds")})
+                except DuplicateKeyError:
+                    if claimed:
+                        db().meta.delete_one({"_id": "bootstrap"})
+                    form.add_error(None, "An account with this email already exists. Please sign in.")
+                except PyMongoError:
+                    if claimed:
+                        db().meta.delete_one({"_id": "bootstrap"})
+                    raise                                       # db_safe shows the friendly message
+                else:
+                    audit(request, "register", f"{email} as {role}", actor=email)
+                    mail.account_created(email, name, role)     # confirmation e-mail (background, never blocks)
+                    messages.success(request, f"Account created for {name} ({role.title()}). You can now sign in with {email}.")
+                    return redirect("login")
+        return render(request, "register.html", {"form": form, "first": first}, status=form_feedback(request, form))
     return render(request, "register.html", {"form": form, "first": first})
+
 
 def logout_view(request):
     audit(request, "logout")
