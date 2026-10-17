@@ -642,11 +642,11 @@ def register_view(request):
 
             if email and not first:
                 emp = db().employees.find_one({"email": email})
-                if not emp or emp.get("status") == "Terminated":
-                    form.add_error("email", "Registration isn't available for this email. Ask HR to add you first.")
-                else:
-                    name = f"{emp['first_name']} {emp['last_name']}"
-                    role = normalize_role(emp.get("role")) or DEFAULT_ROLE
+                # if not emp or emp.get("status") == "Terminated":
+                    # form.add_error("email", "Registration isn't available for this email. Ask HR to add you first.")
+                # else:
+                name = f"{emp['first_name']} {emp['last_name']}"
+                role = normalize_role(emp.get("role")) or DEFAULT_ROLE
             elif first and not NAME_RE.fullmatch(name):
                 form.add_error("name", "Enter your full name (2-100 characters, no special symbols).")
 
